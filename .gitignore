@@ -1,0 +1,10 @@
+# İşletim sistemi ve editör dosyaları
+.DS_Store
+.vscode/
+
+# Node.js bağımlılıkları
+node_modules/
+
+# Yerel test verilerin (Sunucuda yeniden oluşacak)
+accounts.json
+player_saves/

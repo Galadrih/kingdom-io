@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Metin2 Klonu – Modern Envanter</title>
+    <link rel="stylesheet" href="/style.css"/>
+</head>
+<body>
+
+<div id="loginScreen">
+    <h1>Hesabına Giriş Yap</h1>
+    
+    <div class="choice-block">
+        <h3>Kullanıcı Adı</h3>
+        <input type="text" id="accountNameInput" placeholder="Kullanıcı adınızı girin...">
+    </div>
+    
+    <div class="choice-block">
+        <h3>Şifre</h3>
+        <input type="password" id="passwordInput" placeholder="Şifrenizi girin...">
+    </div>
+
+    <button id="loginBtn">Giriş Yap</button>
+    <button id="showRegisterBtn" style="margin-top: 15px;">Hesap Oluştur</button>
+    
+    <div id="registerForm" class="hidden" style="margin-top: 20px;">
+        <h3>Yeni Hesap Oluştur</h3>
+        <input type="password" id="registerPasswordConfirm" placeholder="Şifre Tekrar">
+        <button id="registerBtn" style="margin-top: 10px;">Hesabı Kaydet</button>
+    </div>
+</div>
+
+<div id="characterSelectionScreen" class="hidden">
+    <h1>Karakter Seçimi</h1>
+    <div class="choice-block">
+        <h3>Lütfen bir karakter seçin (Slot: <span id="charSlotCount">0/2</span>)</h3>
+        <div id="characterList" class="button-group" style="flex-direction: column; gap: 10px;">
+            </div>
+    </div>
+    
+    <button id="createCharBtn" style="margin-top: 20px;" class="hidden">Yeni Karakter Oluştur</button>
+    <button id="selectCharBtn" style="margin-top: 10px;" disabled>Karakter Seç & Oyuna Başla</button>
+</div>
+
+<div id="creationScreen" class="hidden">
+    <h1>Karakter Oluştur</h1>
+    
+    <div class="choice-block">
+        <h3>Karakter Adı</h3>
+        <input type="text" id="playerNameInput" placeholder="Karakter adınızı girin...">
+    </div>
+
+    <div class="choice-block">
+        <h3>Krallık Seç</h3>
+        <div class="button-group" id="kingdomSelection">
+            <button class="choice-btn" data-kingdom="shinsoo">Shinsoo</button>
+            <button class="choice-btn" data-kingdom="jinno">Jinno</button>
+            <button class="choice-btn" data-kingdom="chunjo">Chunjo</button>
+        </div>
+    </div>
+    
+    <div class="choice-block">
+        <h3>Sınıf Seç</h3>
+        <div class="button-group" id="classSelection">
+            <button class="choice-btn" data-class="warrior">Savaşçı</button>
+            <button class="choice-btn" data-class="ninja">Ninja</button>
+            <button class="choice-btn" data-class="sura">Sura</button>
+            <button class="choice-btn" data-class="shaman">Şaman</button>
+            <button class="choice-btn" data-class="lycan">Lycan</button>
+        </div>
+    </div>
+
+    <button id="startGameBtn">Oyuna Başla</button>
+</div>
+
+<div id="gameWorld" class="hidden">
+    <div id="gameUI">
+        <div id="playerStats">
+            <div class="stat-row">
+                <span class="stat-label">LVL</span>
+                <span id="playerLevel" class="stat-value">1</span>
+            </div>
+            <div class="stat-row">
+                <div class="hp-bar">
+                    <div id="hpBar" class="bar-fill" style="width: 100%"></div>
+                </div>
+                <span id="hpText" class="stat-text">100/100</span>
+            </div>
+            <div class="stat-row">
+                <div class="mp-bar">
+                    <div id="mpBar" class="bar-fill" style="width: 100%"></div>
+                </div>
+                <span id="mpText" class="stat-text">50/50</span>
+            </div>
+            <div class="stat-row">
+                <div class="exp-bar">
+                    <div id="expBar" class="bar-fill" style="width: 0%"></div>
+                </div>
+                <span id="expText" class="exp-text">0/100</span>
+            </div>
+        </div>
+        
+        <div id="notificationPanel" class="notification-panel hidden">
+            <h4 id="notificationTitle"></h4>
+            <p id="notificationMessage"></p>
+        </div>
+        
+        <div id="buffsPanel"></div>
+
+        <div id="actionBar">
+            <div class="action-slot" data-slot="1"></div>
+            <div class="action-slot" data-slot="2"></div>
+            <div class="action-slot" data-slot="3"></div>
+            <div class="action-slot" data-slot="4"></div>
+            <div class="action-slot" data-slot="5"></div>
+            <div class="action-slot" data-slot="6"></div>
+        </div>
+
+        <div id="rightPanel">
+            <div id="inventoryBtn" class="panel-btn">I</div>
+
+            <div id="inventoryPanel" class="inventory-panel hidden">
+                
+                <div class="inventory-content-wrapper">
+                    <div class="character-section">
+                        <div class="character-silhouette"></div>
+                        <div class="equip-slot" data-type="weapon"   title="Silah"></div>
+                        <div class="equip-slot" data-type="helmet"   title="Kask"></div>
+                        <div class="equip-slot" data-type="armor"    title="Zırh"></div>
+                        <div class="equip-slot" data-type="shield"   title="Kalkan"></div>
+                        <div class="equip-slot" data-type="necklace" title="Kolye"></div>
+                        <div class="equip-slot" data-type="earring"  title="Küpe"></div>
+                        <div class="equip-slot" data-type="bracelet" title="Bilezik"></div>
+                        <div class="equip-slot" data-type="shoes"    title="Ayakkabı"></div>
+                    </div>
+                    
+                    <div id="inventoryGrid"></div>
+                </div>
+                
+                <div id="inventoryYangDisplay" class="inventory-yang-display">
+                    <span>Yang:</span>
+                    <span id="playerYangAmount">0</span>
+                </div>
+            </div>
+            <canvas id="miniMap" class="mini-map" width="150" height="150"></canvas>
+        </div>
+    </div>
+
+    <div id="characterPanel" class="char-panel hidden">
+        <div class="char-panel-header">
+            <h3>Karakter (C)</h3>
+            <button id="characterPanelCloseBtn">X</button>
+        </div>
+        
+        <div class="char-panel-content">
+            <div class="char-info-box">
+                <div id="charInfoName" class="char-info-name">Karakter Adı</div>
+                <div class="char-info-row">
+                    <span>Seviye:</span>
+                    <span id="charInfoLevel">1</span>
+                </div>
+                <div class="char-info-row">
+                    <span>Tecrübe:</span>
+                    <span id="charInfoExp">0 / 100</span>
+                </div>
+            </div>
+
+            <div class="char-stats-box">
+                <div class="char-stat-row">
+                    <span class="stat-name vit">VIT</span>
+                    <span id="statVIT" class="stat-value">0</span>
+                    <button class="stat-plus-btn" data-stat="vit">+</button>
+                </div>
+                <div class="char-stat-row">
+                    <span class="stat-name str">STR</span>
+                    <span id="statSTR" class="stat-value">0</span>
+                    <button class="stat-plus-btn" data-stat="str">+</button>
+                </div>
+                <div class="char-stat-row">
+                    <span class="stat-name int">INT</span>
+                    <span id="statINT" class="stat-value">0</span>
+                    <button class="stat-plus-btn" data-stat="int">+</button>
+                </div>
+                <div class="char-stat-row">
+                    <span class="stat-name dex">DEX</span>
+                    <span id="statDEX" class="stat-value">0</span>
+                    <button class="stat-plus-btn" data-stat="dex">+</button>
+                </div>
+            </div>
+             <div class="char-panel-footer">
+                <span id="charPointsDisplay">Kalan Puan: 0</span>
+            </div>
+        </div>
+
+        <div class="char-derived-stats">
+             <div class="char-info-row"><span>HP:</span><span id="derivedHP">0 / 0</span></div>
+             <div class="char-info-row"><span>MP:</span><span id="derivedMP">0 / 0</span></div>
+             <div class="char-info-row"><span>Saldırı Değeri:</span><span id="derivedDMG">0</span></div>
+             <div class="char-info-row"><span>Savunma:</span><span id="derivedDEF">0</span></div>
+             <div class="char-info-row"><span>Büyü Saldırısı:</span><span id="derivedMATK">0</span></div>
+        </div>
+    </div>
+
+    <div id="skillPanel" class="skill-panel hidden">
+        <div class="skill-panel-header">
+            <h3>Beceri Paneli (K)</h3>
+            <button id="skillPanelCloseBtn">X</button>
+        </div>
+        <div id="skillPanelList">
+            </div>
+        <div class="skill-panel-footer">
+            <span id="skillPointsDisplay">Kalan Puan: 0</span>
+        </div>
+    </div>
+
+    <div id="shopPanel" class="shop-panel hidden">
+        <div class="shop-panel-header">
+            <h3>Satıcı (Merchant)</h3>
+            <button id="shopPanelCloseBtn">X</button>
+        </div>
+        
+        <div class="shop-tabs">
+            <button class="tab-btn active" data-tab="buy">Satın Al</button>
+            <button class="tab-btn" data-tab="sell">Sat</button>
+        </div>
+        
+        <div class="shop-content">
+            <div id="buyTab" class="shop-tab active">
+                <div id="shopList" class="shop-list">
+                    </div>
+            </div>
+            
+            <div id="sellTab" class="shop-tab hidden">
+                <div id="sellList" class="shop-list">
+                    </div>
+            </div>
+        </div>
+
+        <div class="shop-panel-footer">
+            <span>Yang:</span>
+            <span id="playerYangDisplay">0</span>
+        </div>
+    </div>
+
+    <div id="warnPanel" class="warn-panel hidden">
+        <span id="warnPanelText"></span>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="skillChoiceWindow" class="skill-choice-panel hidden">
+        <h3 id="skillChoiceTitle">Beceri Setini Seç</h3>
+        <p id="skillChoiceDesc">5. seviyeye ulaştın! Sınıfın için bir uzmanlık yolu seçmelisin. Bu seçim kalıcıdır.</p>
+        <div id="skillChoiceButtons">
+            </div>
+        <button id="skillChoiceCloseBtn">Kapat</button>
+    </div>
+</div>
+    
+<script src="/socket.io/socket.io.js"></script>
+<script src="/client.js"></script>
+</body>
+</html>

@@ -101,6 +101,80 @@
             </div>
         </div>
 
+        <div id="tradeRequestPanel" class="panel hidden">
+    <div class="panel-header">
+        <h4>Ticaret Daveti</h4>
+    </div>
+    <div id="tradeRequestMessage" style="padding: 15px; text-align: center;">
+        Oyuncu 'OyuncuAdı' sizinle ticaret yapmak istiyor.
+    </div>
+    <div class="panel-buttons" style="justify-content: space-around;">
+        <button id="tradeRequestAccept">Kabul Et</button>
+        <button id="tradeRequestDecline">Reddet</button>
+    </div>
+</div>
+
+<div id="tradePanel" class="panel hidden" style="width: 600px; height: 400px;">
+    <div class="panel-header">
+        <h4>Ticaret Ekranı</h4>
+        <button id="tradeCancelBtn" class="close-btn">X</button>
+    </div>
+    
+    <div class="trade-container">
+        <div class="trade-side" id="myTradeSide">
+            <div class="trade-header">
+                <span id="myTradeName">Ben</span>
+                <div class="trade-status" id="myTradeStatus"></div>
+            </div>
+            <div class="trade-grid" id="myTradeGrid">
+                <div class="trade-slot" data-trade-index="0"></div>
+                <div class="trade-slot" data-trade-index="1"></div>
+                <div class="trade-slot" data-trade-index="2"></div>
+                <div class="trade-slot" data-trade-index="3"></div>
+                <div class="trade-slot" data-trade-index="4"></div>
+                <div class="trade-slot" data-trade-index="5"></div>
+                <div class="trade-slot" data-trade-index="6"></div>
+                <div class="trade-slot" data-trade-index="7"></div>
+                <div class="trade-slot" data-trade-index="8"></div>
+                <div class="trade-slot" data-trade-index="9"></div>
+                <div class="trade-slot" data-trade-index="10"></div>
+                <div class="trade-slot" data-trade-index="11"></div>
+            </div>
+            <div class="trade-yang">
+                <label>Yang:</label>
+                <input type="number" id="myTradeYang" min="0" value="0">
+            </div>
+        </div>
+        
+        <div class="trade-side" id="opponentTradeSide">
+            <div class="trade-header">
+                <span id="opponentTradeName">Karşı Taraf</span>
+                <div class="trade-status" id="opponentTradeStatus"></div>
+            </div>
+            <div class="trade-grid" id="opponentTradeGrid">
+                </div>
+            <div class="trade-yang">
+                <label>Yang:</label>
+                <input type="number" id="opponentTradeYang" value="0" disabled>
+            </div>
+        </div>
+    </div>
+    
+    <div class="trade-footer">
+        <div id="tradeConfirmStatus" style="color: #ffc; font-size: 12px;"></div>
+        <button id="tradeAcceptBtn">Kabul Et</button>
+    </div>
+</div>
+
+        <div id="partyPanel" class="hidden">
+        <div id="partyMemberList">
+            </div>
+        <div id="partyControls">
+            <button id="partyLeaveBtn">Partiden Ayrıl</button>
+        </div>
+    </div>
+    
+
         <div id="targetPlayerMenu" class="panel hidden">
     <div class="panel-header">
         <h3 id="targetPlayerName">Oyuncu Adı</h3>
@@ -112,6 +186,19 @@
         <button id="targetActionTrade" class="buy-btn">Ticaret</button>
     </div>
 </div>
+
+<div id="partyInvitePanel" class="panel hidden">
+    <div class="panel-header">
+        <h3 id="partyInviteTitle">Parti Daveti</h3>
+    </div>
+    <div class="panel-content" style="text-align: center; padding: 20px;">
+        <p id="partyInviteMessage">Oyuncu '...' sizi partisine davet ediyor.</p>
+        <div id="partyInviteActions" style="display: flex; justify-content: space-around; margin-top: 20px;">
+            <button id="partyInviteAccept" class="buy-btn" style="background-color: #00aa55;">Kabul Et</button>
+            <button id="partyInviteDecline" class="buy-btn" style="background-color: #aa0055;">Reddet</button>
+        </div>
+    </div>
+</div>
         
         <div id="notificationPanel" class="notification-panel hidden">
             <h4 id="notificationTitle"></h4>
@@ -120,17 +207,16 @@
         
         <div id="buffsPanel"></div>
 
-        <div id="gameUI">
-    <div id="chatContainer">
-        <div id="chatMessages">
-            <div class="chat-msg system">Sohbet sistemine hoş geldin!</div>
-        </div>
-        <input type="text" id="chatInput" placeholder="Söylemek için Enter'a basın...">
-    </div>
-    </div>
+            <div id="chatContainer">
+                <div id="chatMessages">
+                    <div class="chat-msg system">Sohbet sistemine hoş geldin!</div>
+                </div>
+                <input type="text" id="chatInput" placeholder="Söylemek için Enter'a basın...">
+            </div>
 
-<div id="characterPanel" class="char-panel hidden">
-    </div>
+            
+
+
 
         <div id="actionBar">
             <div class="action-slot" data-slot="1"></div>

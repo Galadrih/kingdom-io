@@ -4,6 +4,7 @@ const socketIo = require("socket.io");
 
 const fs = require('fs'); 
 const path = require('path'); 
+const { v4: uuidv4 } = require('uuid');
 
 // YENİ: Şifreleri güvenli hale getirmek için kripto kütüphanesi ekle (npm install bcrypt)
 // Eğer npm install bcrypt yapmadıysanız, aşağıdaki satırı şimdilik yorum satırı yapın ve sadece düz şifre kullanın.
@@ -35,6 +36,8 @@ let players = {};
 let mobs = {};
 let npcs = {};
 let lastMobId = 0;
+let parties = {};
+let activeTrades = {};
 
 // ---------------------- EŞYA VERİTABANI ----------------------
 // ---------------------- EŞYA VERİTABANI ----------------------
@@ -866,6 +869,7 @@ function createPlayer(socket, data) {
             skills: existingData.skills || {},
             activeBuffs: {},
             skillCooldowns: {}
+            
         };
         console.log(`${player.name} (${player.class}) YÜKLENDİ.`);
         
@@ -913,7 +917,8 @@ function createPlayer(socket, data) {
             statPoints: 0,
             skills: {},
             activeBuffs: {},
-            skillCooldowns: {} 
+            skillCooldowns: {},
+            partyId: null
         };
         console.log(`${player.name} adlı YENİ oyuncu oluşturuldu.`);
     }
@@ -1742,24 +1747,83 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
   // --- YENİ EKLENDİ (SOHBET) ---
   socket.on("sendChatMessage", (data) => {
       const player = players[socket.id];
-      if (!player) return; // Oyuncu yoksa (bir hata varsa)
+      if (!player) return;
 
       const message = data.message.trim();
-      if (message.length === 0 || message.length > 100) { // Boş veya çok uzun mesajları engelle
+      if (message.length === 0 || message.length > 100) {
           return;
       }
 
-      // Şu an için 'Genel Sohbet' yapıyoruz (Harita fark etmeksizin herkese gönder)
-      // TODO: Gelecekte /w (fısıltı) veya haritaya özel sohbet eklenebilir.
+      // =================================================================
+      // ### YENİ FISILTI (WHISPER) MANTIĞI ###
+      // =================================================================
       
-      console.log(`[Sohbet] ${player.name}: ${message}`);
+      // 1. Mesaj /w ile mi başlıyor?
+      if (message.startsWith("/w ") || message.startsWith("/W ")) {
+          const parts = message.split(" ");
+          if (parts.length < 3) { // Eğer "/w OyuncuAdı" yazıp mesaj yazmadıysa
+              socket.emit("newChatMessage", {
+                  type: 'error',
+                  message: `Kullanım: /w <OyuncuAdı> <Mesajınız>`
+              });
+              return;
+          }
 
-      // Tüm oyunculara (gönderen dahil) mesajı dağıt
-      io.emit("newChatMessage", {
-          type: 'general',
-          sender: player.name, // Gönderenin adını ekle
-          message: message     // Mesajı ekle
-      });
+          const targetName = parts[1];
+          const whisperMessage = parts.slice(2).join(" ");
+
+          // 2. Hedef oyuncuyu bul (Büyük/küçük harf duyarsız)
+          const targetPlayer = Object.values(players).find(
+              p => p.name.toLowerCase() === targetName.toLowerCase()
+          );
+
+          // 3. Kontroller
+          if (!targetPlayer) {
+              socket.emit("newChatMessage", {
+                  type: 'error',
+                  message: `Oyuncu '${targetName}' bulunamadı veya çevrimdışı.`
+              });
+              return;
+          }
+          
+          if (targetPlayer.id === player.id) {
+               socket.emit("newChatMessage", {
+                  type: 'error',
+                  message: `Kendinize fısıltı gönderemezsiniz.`
+              });
+              return;
+          }
+
+          // 4. Fısıltıyı Gönder
+          console.log(`[Fısıltı] ${player.name} -> ${targetPlayer.name}: ${whisperMessage}`);
+          
+          // 4a. Mesajı HEDEFE gönder
+          io.to(targetPlayer.id).emit("newChatMessage", {
+              type: 'whisper_received',
+              sender: player.name,
+              message: whisperMessage
+          });
+          
+          // 4b. Mesajın GÖNDERİLDİĞİNİ GÖNDERENE bildir
+          socket.emit("newChatMessage", {
+              type: 'whisper_sent',
+              target: targetPlayer.name,
+              message: whisperMessage
+          });
+
+      } else {
+          // --- ESKİ GENEL SOHBET MANTIĞI ---
+          // Mesaj /w ile başlamıyorsa, genel sohbete gönder
+          console.log(`[Genel Sohbet] ${player.name}: ${message}`);
+          io.emit("newChatMessage", {
+              type: 'general',
+              sender: player.name,
+              message: message
+          });
+      }
+      // =================================================================
+      // ### YENİ MANTIK SONU ###
+      // =================================================================
   });
 
   socket.on("attemptUpgrade", ({ inventoryIndex }) => {
@@ -1851,6 +1915,150 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
     socket.emit("registerSuccess");
 });
 
+// Önce bir yardımcı fonksiyon ekleyelim
+  function sendPartyUpdate(partyId) {
+      const party = parties[partyId];
+      if (!party) return;
+
+      // Partideki herkesin en güncel verisini (HP, MP vb.)
+      // göndermek yerine, sadece parti YAPISINI gönderiyoruz.
+      // Client, bu yapıya göre kendi 'players' objesinden verileri çekecek.
+      
+      // Partideki herkese güncel listeyi gönder
+      party.members.forEach(memberId => {
+          if (players[memberId]) { // Oyuncu hala oyundaysa
+              io.to(memberId).emit("partyDataUpdate", party);
+          }
+      });
+  }
+
+  socket.on("inviteToParty", (targetPlayerId) => {
+      const inviter = players[socket.id];
+      const target = players[targetPlayerId];
+
+      if (!inviter || !target) return;
+      if (target.partyId) {
+          socket.emit("showNotification", { title: "Hata", message: `${target.name} zaten bir partide.` });
+          return;
+      }
+      if (inviter.partyId) {
+          const party = parties[inviter.partyId];
+          if (party && party.leader !== inviter.id) {
+              socket.emit("showNotification", { title: "Hata", message: "Sadece parti lideri davet gönderebilir." });
+              return;
+          }
+      }
+
+      // Hedef oyuncuya davet gönder
+      io.to(targetPlayerId).emit("partyInviteReceived", {
+          inviterId: inviter.id,
+          inviterName: inviter.name
+      });
+
+      socket.emit("showNotification", { title: "Davet", message: `${target.name} partiye davet edildi.` });
+  });
+
+  socket.on("acceptPartyInvite", (data) => {
+      const invitedPlayer = players[socket.id]; // Daveti kabul eden (kendisi)
+      const inviter = players[data.inviterId]; // Daveti gönderen
+
+      if (!invitedPlayer || !inviter || invitedPlayer.partyId) return;
+
+      let party;
+      let partyId = inviter.partyId;
+
+      if (partyId && parties[partyId]) {
+          // 1. Davet eden zaten bir partideyse, o partiye katıl
+          party = parties[partyId];
+          party.members.push(invitedPlayer.id);
+      } else {
+          // 2. Yeni parti kur
+          partyId = uuidv4();
+          party = {
+              id: partyId,
+              leader: inviter.id,
+              members: [inviter.id, invitedPlayer.id]
+          };
+          parties[partyId] = party;
+          inviter.partyId = partyId; // Davet edenin de parti ID'sini ayarla
+      }
+
+      invitedPlayer.partyId = partyId; // Davet edilenin parti ID'sini ayarla
+      
+      // Partideki herkese (yeni üye dahil) güncelleme gönder
+      sendPartyUpdate(partyId);
+  });
+
+  socket.on("declinePartyInvite", (data) => {
+      const target = players[data.inviterId];
+      if (target) {
+          io.to(data.inviterId).emit("showNotification", {
+              title: "Parti",
+              message: `${players[socket.id]?.name || 'Oyuncu'} davetinizi reddetti.`
+          });
+      }
+  });
+
+  socket.on("leaveParty", () => {
+      const player = players[socket.id];
+      if (!player || !player.partyId) return;
+
+      const partyId = player.partyId;
+      const party = parties[partyId];
+      if (!party) return;
+
+      // Oyuncuyu partiden çıkar
+      party.members = party.members.filter(id => id !== player.id);
+      player.partyId = null;
+
+      // Ayrılan oyuncuya UI'ı temizlemesi için null gönder
+      socket.emit("partyDataUpdate", null);
+
+      if (party.members.length <= 1) {
+          // Partide 1 kişi kaldıysa (veya 0), partiyi dağıt
+          if (party.members.length === 1) {
+              const lastMember = players[party.members[0]];
+              if (lastMember) {
+                  lastMember.partyId = null;
+                  io.to(lastMember.id).emit("partyDataUpdate", null);
+              }
+          }
+          delete parties[partyId];
+          console.log(`Parti ${partyId} dağıtıldı.`);
+      } else if (party.leader === player.id) {
+          // Lider ayrıldıysa, yeni bir lider ata
+          party.leader = party.members[0];
+          sendPartyUpdate(partyId);
+      } else {
+          // Normal üye ayrıldıysa, kalanlara güncelle
+          sendPartyUpdate(partyId);
+      }
+  });
+
+  socket.on("kickFromParty", (targetPlayerId) => {
+      const leader = players[socket.id];
+      const target = players[targetPlayerId];
+      if (!leader || !target || !leader.partyId) return;
+
+      const party = parties[leader.partyId];
+      if (!party || party.leader !== leader.id) {
+          socket.emit("showNotification", { title: "Hata", message: "Oyuncu atma yetkiniz yok." });
+          return;
+      }
+      if (leader.id === target.id) return; // Kendini atamaz
+
+      // Hedefi partiden çıkar
+      party.members = party.members.filter(id => id !== target.id);
+      target.partyId = null;
+
+      // Atılan oyuncuya UI'ı temizlemesi için null gönder
+      io.to(target.id).emit("partyDataUpdate", null);
+      io.to(target.id).emit("showNotification", { title: "Parti", message: "Partiden atıldın." });
+
+      // Partidekilere güncelleme gönder
+      sendPartyUpdate(party.id);
+  });
+
 // YENİ EVENT: Giriş Yapma
 socket.on("loginAttempt", async ({ username, password }) => {
     const account = accounts[username];
@@ -1935,13 +2143,523 @@ socket.on("createOrJoinCharacter", (characterChoices) => {
 // createPlayer fonksiyonunu güncelleyin: Artık SADECE data.name'e göre yükleme yapacak.
 // Zaten oyuncu varsa yükleyecek, yoksa sıfırdan oluşturacak (Yukarıdaki 3. adımda kontrol edildi)
 
-// disconnect eventini güncelle (Ek bilgi için)
-socket.on("disconnect", () => {
+
+/**
+ * Bir oyuncunun envanterindeki boş slot sayısını döndürür.
+ */
+function getEmptyInventorySlots(player) {
+    return player.inventory.filter(slot => slot === null).length;
+}
+
+/**
+ * Verilen eşya listesini oyuncunun envanterine ekler.
+ * (Potları birleştirir, diğerlerini boş slotlara koyar)
+ * @returns {boolean} - Tüm eşyalar sığdıysa true, sığmadıysa false.
+ */
+function addItemsToInventory(player, itemsToAdd) {
+    let allAdded = true;
+    for (const item of itemsToAdd) {
+        if (!item) continue;
+        
+        let itemAdded = false;
+        
+        // Tüketilebilirse yığınla
+        if (item.type === 'consumable' && item.quantity) {
+            for (let i = 0; i < player.inventory.length; i++) {
+                const slot = player.inventory[i];
+                if (slot && slot.id === item.id && (slot.quantity || 0) < 200) {
+                    const spaceLeft = 200 - (slot.quantity || 0);
+                    const amountToAdd = Math.min(item.quantity, spaceLeft);
+                    slot.quantity += amountToAdd;
+                    item.quantity -= amountToAdd;
+                    if (item.quantity <= 0) {
+                        itemAdded = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Kalanı (veya yığınlanamayanı) boş slota koy
+        if (item.quantity === undefined || item.quantity > 0) {
+            const emptyIndex = player.inventory.findIndex(slot => slot === null);
+            if (emptyIndex !== -1) {
+                player.inventory[emptyIndex] = item;
+                itemAdded = true;
+            }
+        }
+        
+        if (!itemAdded) {
+            allAdded = false;
+            // TODO: Eşya yere düşebilir (şimdilik kayboluyor)
+            console.error(`HATA: ${player.name} envanteri dolu, ${item.name} eklenemedi!`);
+        }
+    }
+    return allAdded;
+}
+
+/**
+ * Aktif bir ticareti sonlandırır ve her iki tarafa da haber verir.
+ */
+function cancelTrade(tradeId, notifyMessage) {
+    const trade = activeTrades[tradeId];
+    if (!trade) return;
+
+    const playerA = players[trade.playerA_id];
+    const playerB = players[trade.playerB_id];
+
+    if (playerA) {
+        playerA.tradeId = null;
+        // KRİTİK: A tarafına İptal Sinyali Gönder
+        io.to(playerA.id).emit("tradeCancelled", { message: notifyMessage });
+    }
+    if (playerB) {
+        playerB.tradeId = null;
+        // KRİTİK: B tarafına İptal Sinyali Gönder
+        io.to(playerB.id).emit("tradeCancelled", { message: notifyMessage });
+    }
+    
+    delete activeTrades[tradeId];
+    console.log(`Ticaret ${tradeId} iptal edildi: ${notifyMessage}`);
+}
+/**
+ * Ticareti onaylar ve eşya/yang transferini gerçekleştirir.
+ */
+function executeTrade(tradeId) {
+    try {
+        const trade = activeTrades[tradeId];
+        if (!trade || !trade.playerA_locked || !trade.playerB_locked) {
+            return cancelTrade(tradeId, "Onay hatası nedeniyle ticaret iptal edildi.");
+        }
+    
+        const playerA = players[trade.playerA_id];
+        const playerB = players[trade.playerB_id];
+
+        if (!playerA || !playerB) {
+            return cancelTrade(tradeId, "Oyunculardan biri çevrimdışı.");
+        }
+
+        // --- 1. SON DOĞRULAMA (HACK KONTROLÜ) ---
+        
+        // Yang Kontrolü
+        if (playerA.yang < trade.playerA_offer.yang || playerB.yang < trade.playerB_offer.yang) {
+            return cancelTrade(tradeId, "Yetersiz Yang nedeniyle ticaret iptal edildi.");
+        }
+        
+        // Eşya Varlığı Kontrolü
+        const itemsA = [];
+        for (const offer of trade.playerA_offer.items) {
+            const item = playerA.inventory[offer.invIndex];
+            if (!item || item.id !== offer.item.id) {
+                 return cancelTrade(tradeId, `Ticaret hatası (A Tarafı): ${offer.item.name} envanterde bulunamadı.`);
+            }
+            itemsA.push(item);
+        }
+        
+        const itemsB = [];
+        for (const offer of trade.playerB_offer.items) {
+            const item = playerB.inventory[offer.invIndex];
+            if (!item || item.id !== offer.item.id) {
+                 return cancelTrade(tradeId, `Ticaret hatası (B Tarafı): ${offer.item.name} envanterde bulunamadı.`);
+            }
+            itemsB.push(item);
+        }
+        
+        // Envanter Yeri Kontrolü
+        const slotsA_needed = itemsB.length;
+        const slotsB_needed = itemsA.length;
+        const slotsA_available = getEmptyInventorySlots(playerA) + itemsA.length;
+        const slotsB_available = getEmptyInventorySlots(playerB) + itemsB.length;
+
+        if (slotsA_available < slotsA_needed) {
+            io.to(playerA.id).emit("showNotification", { title: "Ticaret Başarısız", message: "Envanterinizde yeterli boş yer yok." });
+            io.to(playerB.id).emit("showNotification", { title: "Ticaret Başarısız", message: "Karşı tarafın envanterinde yeterli boş yer yok." });
+            return cancelTrade(tradeId, "Yetersiz envanter yeri (A).");
+        }
+        if (slotsB_available < slotsB_needed) {
+             io.to(playerB.id).emit("showNotification", { title: "Ticaret Başarısız", message: "Envanterinizde yeterli boş yer yok." });
+            io.to(playerA.id).emit("showNotification", { title: "Ticaret Başarısız", message: "Karşı tarafın envanterinde yeterli boş yer yok." });
+            return cancelTrade(tradeId, "Yetersiz envanter yeri (B).");
+        }
+
+        // --- 2. TRANSFER ---
+        
+        // Yang Transferi
+        playerA.yang -= trade.playerA_offer.yang;
+        playerA.yang += trade.playerB_offer.yang;
+        playerB.yang -= trade.playerB_offer.yang;
+        playerB.yang += trade.playerA_offer.yang;
+        
+        // Eşya Slotlarını Boşaltma
+        trade.playerA_offer.items.forEach(offer => playerA.inventory[offer.invIndex] = null);
+        trade.playerB_offer.items.forEach(offer => playerB.inventory[offer.invIndex] = null);
+        
+        // Eşyaları Yeni Sahiplerine Ekleme
+        addItemsToInventory(playerA, itemsB);
+        addItemsToInventory(playerB, itemsA);
+
+        // --- 3. BİTİŞ ---
+        console.log(`Ticaret ${tradeId} başarıyla tamamlandı.`);
+        
+        // KRİTİK SİNYALLER:
+        // Her iki tarafa da BAŞARI sinyali gönder
+        io.to(playerA.id).emit("tradeSuccess", { message: "Ticaret başarıyla tamamlandı!" });
+        io.to(playerB.id).emit("tradeSuccess", { message: "Ticaret başarıyla tamamlandı!" });
+        
+        // Oyuncuları kaydet
+        savePlayer(playerA);
+        savePlayer(playerB);
+        
+        // Oturumu temizle
+        playerA.tradeId = null;
+        playerB.tradeId = null;
+        delete activeTrades[tradeId];
+        
+        // Eğer bu noktaya ulaşırsak fonksiyonu sonlandırırız.
+        return; 
+        
+    } catch (error) {
+        console.error("!!! Ticaret YÜRÜTÜLÜRKEN KRİTİK HATA:", error);
+        // Hata oluşursa ticareti güvenli bir şekilde iptal et
+        cancelTrade(tradeId, "Bilinmeyen bir sunucu hatası nedeniyle ticaret iptal edildi.");
+    }
+}
+
+
+
+// --- Socket Dinleyicileri ---
+
+socket.on("requestTrade", (targetPlayerId) => {
+    const requester = players[socket.id];
+    const target = players[targetPlayerId];
+
+    if (!requester || !target) return;
+    if (requester.tradeId || target.tradeId) {
+        return socket.emit("showNotification", { title: "Hata", message: "Oyunculardan biri zaten bir ticaret ekranında." });
+    }
+    if (requester.id === target.id) return;
+    
+    // Güvenli bölge kontrolü (opsiyonel ama önerilir)
+    // const map = MAP_DATA[requester.map];
+    // if (!map.safeZone || distance(requester, map.safeZone) > map.safeZone.radius) {
+    //     return socket.emit("showNotification", { title: "Hata", message: "Ticaret sadece güvenli bölgelerde yapılabilir." });
+    // }
+
+    // Hedef oyuncuya davet gönder
+    io.to(targetPlayerId).emit("tradeRequestReceived", {
+        requesterId: requester.id,
+        requesterName: requester.name
+    });
+
+    socket.emit("showNotification", { title: "Ticaret", message: `${target.name} oyuncusuna ticaret daveti gönderildi.` });
+});
+
+socket.on("declineTrade", (requesterId) => {
+    const targetName = players[socket.id]?.name || "Oyuncu";
+    io.to(requesterId).emit("tradeRequestDeclined", {
+        message: `${targetName} ticaret davetinizi reddetti.`
+    });
+});
+
+socket.on("acceptTrade", (requesterId) => {
+    // Daveti kabul eden (B) oyuncusu
+    const playerB = players[socket.id]; 
+    // Daveti gönderen (A) oyuncusu
+    const playerA = players[requesterId]; 
+
+    if (!playerA || !playerB || playerA.tradeId || playerB.tradeId) {
+        return; // Biri meşgul veya çevrimdışı
+    }
+
+    const tradeId = uuidv4();
+    const tradeSession = {
+        id: tradeId,
+        playerA_id: playerA.id, 
+        playerB_id: playerB.id, 
+        playerA_offer: { items: [], yang: 0 },
+        playerB_offer: { items: [], yang: 0 },
+        playerA_locked: false,
+        playerB_locked: false,
+        playerA_confirmed: false,
+        playerB_confirmed: false,
+    };
+    
+    activeTrades[tradeId] = tradeSession;
+    playerA.tradeId = tradeId;
+    playerB.tradeId = tradeId;
+
+    // Her iki oyuncuya da ticaret penceresini açtır
+    
+    // playerA için gönderilen data
+    const tradeDataA = {
+        tradeId: tradeId,
+        myId: playerA.id,
+        opponent: { id: playerB.id, name: playerB.name },
+        myOffer: tradeSession.playerA_offer,
+        opponentOffer: tradeSession.playerB_offer,
+        
+        // KRİTİK EKLENTİ
+        playerA_id: playerA.id, 
+        playerB_id: playerB.id,
+        // KRİTİK EKLENTİ SONU
+        
+        playerA_locked: tradeSession.playerA_locked,
+        playerB_locked: tradeSession.playerB_locked,
+    };
+
+    io.to(playerA.id).emit("tradeWindowOpen", tradeDataA);
+    
+    // playerB için gönderilen data (A ve B'nin rolleri yer değiştirir)
+    const tradeDataB = {
+        tradeId: tradeId,
+        myId: playerB.id,
+        opponent: { id: playerA.id, name: playerA.name },
+        myOffer: tradeSession.playerB_offer,
+        opponentOffer: tradeSession.playerA_offer,
+        
+        // KRİTİK EKLENTİ
+        playerA_id: playerA.id, 
+        playerB_id: playerB.id,
+        // KRİTİK EKLENTİ SONU
+        
+        playerA_locked: tradeSession.playerA_locked,
+        playerB_locked: tradeSession.playerB_locked,
+    };
+    io.to(playerB.id).emit("tradeWindowOpen", tradeDataB);
+    
+    console.log(`Ticaret oturumu başladı: ${tradeId} (${playerA.name} vs ${playerB.name})`);
+});
+
+socket.on("cancelTrade", () => {
     const player = players[socket.id];
+    if (player && player.tradeId) {
+        cancelTrade(player.tradeId, `${player.name} ticareti iptal etti.`);
+    }
+});
+
+/**
+ * Bir oyuncu teklifini değiştirdiğinde (item/yang) tüm onayları sıfırlar.
+ */
+function resetTradeLocks(trade, reason) {
+    if (trade.playerA_locked || trade.playerB_locked) {
+        trade.playerA_locked = false;
+        trade.playerB_locked = false;
+        
+        // Her iki oyuncuya da kilitlerin açıldığını bildir
+        const update = { playerA_locked: false, playerB_locked: false };
+        io.to(trade.playerA_id).emit("tradeLockUpdate", update);
+        io.to(trade.playerB_id).emit("tradeLockUpdate", update);
+        
+        io.to(trade.playerA_id).emit("showNotification", { title: "Ticaret", message: `Teklif değiştiği için onaylar sıfırlandı. (${reason})` });
+        io.to(trade.playerB_id).emit("showNotification", { title: "Ticaret", message: `Teklif değiştiği için onaylar sıfırlandı. (${reason})` });
+    }
+    // Son onayları da sıfırla
+    trade.playerA_confirmed = false;
+    trade.playerB_confirmed = false;
+}
+
+/**
+ * Güncellenmiş teklifi her iki oyuncuya da gönderir.
+ */
+function broadcastTradeOfferUpdate(trade) {
+     io.to(trade.playerA_id).emit("tradeOfferUpdate", {
+        myOffer: trade.playerA_offer,
+        opponentOffer: trade.playerB_offer
+    });
+    io.to(trade.playerB_id).emit("tradeOfferUpdate", {
+        myOffer: trade.playerB_offer,
+        opponentOffer: trade.playerA_offer
+    });
+}
+
+socket.on("addTradeItem", ({ tradeId, inventoryIndex }) => {
+    const player = players[socket.id];
+    const trade = activeTrades[tradeId];
+    if (!player || !trade) return;
+    if (trade.playerA_id !== player.id && trade.playerB_id !== player.id) return;
+    
+    const item = player.inventory[inventoryIndex];
+    if (!item || item.type === 'consumable') { // Pot vb. ticareti şimdilik kapalı
+         return socket.emit("showNotification", { title: "Hata", message: "Tüketilebilir eşyalar (pot) ticarete konulamaz." });
+    }
+    
+    const offerSide = (trade.playerA_id === player.id) ? trade.playerA_offer : trade.playerB_offer;
+    
+    // Zaten teklifte mi?
+    if (offerSide.items.some(offer => offer.invIndex === inventoryIndex)) return;
+    
+    // Maksimum slot (12)
+    if (offerSide.items.length >= 12) {
+        return socket.emit("showNotification", { title: "Hata", message: "Ticaret penceresi dolu (Maks. 12 eşya)." });
+    }
+
+    offerSide.items.push({ invIndex: inventoryIndex, item: item });
+    
+    resetTradeLocks(trade, "Eşya eklendi");
+    broadcastTradeOfferUpdate(trade);
+});
+
+socket.on("removeTradeItem", ({ tradeId, tradeSlotIndex }) => {
+    const player = players[socket.id];
+    const trade = activeTrades[tradeId];
+    if (!player || !trade) return;
+    
+    const offerSide = (trade.playerA_id === player.id) ? trade.playerA_offer : trade.playerB_offer;
+    
+    if (offerSide.items[tradeSlotIndex]) {
+        offerSide.items.splice(tradeSlotIndex, 1); // İtemi diziden çıkar
+        
+        resetTradeLocks(trade, "Eşya kaldırıldı");
+        broadcastTradeOfferUpdate(trade);
+    }
+});
+
+socket.on("setTradeYang", ({ tradeId, amount }) => {
+    const player = players[socket.id];
+    const trade = activeTrades[tradeId];
+    if (!player || !trade) return;
+    
+    const cleanAmount = Math.max(0, Math.floor(amount));
+    if (cleanAmount > player.yang) {
+         // Client'a hata gönder (ancak bu client-side'da da kontrol edilmeli)
+         // Şimdilik sadece oyuncunun max yang'ına sabitliyoruz
+         // cleanAmount = player.yang; 
+         return socket.emit("showNotification", { title: "Hata", message: "Yeterli Yang'ın yok." });
+    }
+    
+    const offerSide = (trade.playerA_id === player.id) ? trade.playerA_offer : trade.playerB_offer;
+    
+    if (offerSide.yang === cleanAmount) return; // Değişiklik yok
+    
+    offerSide.yang = cleanAmount;
+    
+    resetTradeLocks(trade, "Yang değiştirildi");
+    broadcastTradeOfferUpdate(trade);
+});
+
+socket.on("lockTrade", ({ tradeId }) => {
+    const player = players[socket.id];
+    const trade = activeTrades[tradeId];
+    if (!player || !trade) return;
+    
+    let playerKey, opponentKey;
+    if (trade.playerA_id === player.id) {
+        playerKey = "playerA_locked";
+        opponentKey = "playerB_locked";
+    } else {
+        playerKey = "playerB_locked";
+        opponentKey = "playerA_locked";
+    }
+    
+    // 1. Oyuncunun kendi teklifini kilitler (İlk Kabul)
+    trade[playerKey] = true;
+    
+    // 2. Her iki oyuncuya da yeni kilit durumunu gönder (renderTradeWindow'ı tetikler)
+    const update = {
+        playerA_locked: trade.playerA_locked,
+        playerB_locked: trade.playerB_locked,
+    };
+    io.to(trade.playerA_id).emit("tradeLockUpdate", update);
+    io.to(trade.playerB_id).emit("tradeLockUpdate", update);
+});
+
+// server.js
+
+socket.on("confirmTrade", ({ tradeId }) => {
+    try {
+        const player = players[socket.id];
+        const trade = activeTrades[tradeId];
+        if (!player || !trade) return;
+
+        // 1. Son onaydan önce her iki tarafın da KİLİTLİ olduğundan emin ol
+        if (!trade.playerA_locked || !trade.playerB_locked) {
+            return; // Kilitli değilken onaylayamaz
+        }
+        
+        let playerConfirmKey;
+        let opponentId; // Karşı tarafın socket ID'si
+
+        if (trade.playerA_id === player.id) {
+            playerConfirmKey = "playerA_confirmed";
+            opponentId = trade.playerB_id;
+        } else {
+            playerConfirmKey = "playerB_confirmed";
+            opponentId = trade.playerA_id;
+        }
+
+        // 2. Oyuncunun son onay durumunu kaydet
+        trade[playerConfirmKey] = true;
+        
+        // 3. Eğer her iki taraf da son onayı verdiyse, ticareti gerçekleştir
+        if (trade.playerA_confirmed && trade.playerB_confirmed) {
+            executeTrade(tradeId);
+        } else {
+            // 4. Karşı tarafa ve onaylayana durumu bildir
+            
+            // Onaylayana geri bildirim
+            socket.emit("tradeConfirmUpdate", {
+                message: "Onaylandı. Karşı taraf bekleniyor..."
+            });
+            
+            // Karşı tarafa bildirim (SADECE karşı tarafa)
+            io.to(opponentId).emit("tradeConfirmUpdate", {
+                message: "Karşı taraf son onayı verdi. Lütfen onayla."
+            });
+        }
+    
+    } catch (error) {
+        console.error("!!! Ticaret ONAYLANIRKEN KRİTİK HATA:", error);
+        const player = players[socket.id];
+        if (player && player.tradeId) {
+            cancelTrade(player.tradeId, "Onaylama sırasında bir hata oluştu, ticaret iptal edildi.");
+        }
+    }
+});
+
+// server.js (disconnect fonksiyonunu bulun ve güncelleyin)
+
+  socket.on("disconnect", () => {
+    const player = players[socket.id];
+    
+    // --- GÜNCELLEME BAŞLANGICI ---
     if (player) {
-        savePlayer(player);
-        delete players[socket.id];
-    } 
+        // Oyuncu aktif bir ticaretteyse iptal et
+        if (player.tradeId && activeTrades[player.tradeId]) {
+            // CRITICAL: Diğer oyuncuya da sinyal gitmesi için cancelTrade çağrılıyor
+            cancelTrade(player.tradeId, `${player.name} oyundan ayrıldı.`); 
+        }
+        
+        // Oyuncu partideyken ayrılırsa (bu kod zaten vardı, kontrol et)
+        if (player.partyId && parties[player.partyId]) {
+            // ... (Parti ayrılma/dağıtma mantığı) ...
+             const partyId = player.partyId;
+             const party = parties[partyId];
+             if (party) {
+                party.members = party.members.filter(id => id !== player.id);
+                player.partyId = null;
+                if (party.members.length <= 1) {
+                    if (party.members.length === 1) {
+                        const lastMember = players[party.members[0]];
+                        if (lastMember) {
+                            lastMember.partyId = null;
+                            io.to(lastMember.id).emit("partyDataUpdate", null);
+                        }
+                    }
+                    delete parties[partyId];
+                } else if (party.leader === player.id) {
+                    party.leader = party.members[0];
+                    sendPartyUpdate(partyId);
+                } else {
+                    sendPartyUpdate(partyId);
+                }
+             }
+        }
+        
+        savePlayer(player); // Oyuncuyu kaydet
+        delete players[socket.id]; // Oyuncuyu sil
+    }
+    // --- GÜNCELLEME SONU ---
+    
     delete playerToAccountMap[socket.id]; // Hesap bilgisini temizle
     console.log("Bağlantı koptu:", socket.id);
 });

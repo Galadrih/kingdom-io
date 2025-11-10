@@ -19,6 +19,9 @@ const selectCharBtn = document.getElementById("selectCharBtn");
 const chatContainer = document.getElementById("chatContainer");
 const chatMessages = document.getElementById("chatMessages");
 const chatInput = document.getElementById("chatInput");
+const inventoryPanel = document.getElementById("inventoryPanel");
+const characterPanel = document.getElementById("characterPanel");
+const skillPanel = document.getElementById("skillPanel");
 const blacksmithPanel = document.getElementById("blacksmithPanel");
 const upgradeSlot = document.getElementById("upgradeSlot");
 const upgradeItemName = document.getElementById("upgradeItemName");
@@ -33,6 +36,38 @@ const targetActionWhisper = document.getElementById("targetActionWhisper");
 const targetActionInvite = document.getElementById("targetActionInvite");
 const targetActionTrade = document.getElementById("targetActionTrade");
 let selectedTargetPlayerId = null; // Tıkladığımız oyuncunun ID'sini tutar
+// --- YENİ: TİCARET DOM ELEMANLARI ---
+const tradeRequestPanel = document.getElementById("tradeRequestPanel");
+const tradeRequestMessage = document.getElementById("tradeRequestMessage");
+const tradeRequestAccept = document.getElementById("tradeRequestAccept");
+const tradeRequestDecline = document.getElementById("tradeRequestDecline");
+
+const tradePanel = document.getElementById("tradePanel");
+const tradeCancelBtn = document.getElementById("tradeCancelBtn");
+const myTradeName = document.getElementById("myTradeName");
+const myTradeStatus = document.getElementById("myTradeStatus");
+const myTradeGrid = document.getElementById("myTradeGrid");
+const myTradeYang = document.getElementById("myTradeYang");
+
+const opponentTradeName = document.getElementById("opponentTradeName");
+const opponentTradeStatus = document.getElementById("opponentTradeStatus");
+const opponentTradeGrid = document.getElementById("opponentTradeGrid");
+const opponentTradeYang = document.getElementById("opponentTradeYang");
+
+const tradeAcceptBtn = document.getElementById("tradeAcceptBtn");
+const tradeConfirmStatus = document.getElementById("tradeConfirmStatus");
+
+let currentTradeSession = null; // Aktif ticaret oturumunu (ID, teklifler vb.) tutar
+let currentTradeRequesterId = null; // Mevcut ticaret davetini kimden aldık?
+
+const partyPanel = document.getElementById("partyPanel");
+const partyMemberList = document.getElementById("partyMemberList");
+const partyLeaveBtn = document.getElementById("partyLeaveBtn");
+const partyInvitePanel = document.getElementById("partyInvitePanel");
+const partyInviteAccept = document.getElementById("partyInviteAccept");
+const partyInviteDecline = document.getElementById("partyInviteDecline");
+let myParty = null; // Mevcut parti verimizi burada tutacağız
+let currentInviterId = null; // Mevcut davetiyeyi kimden aldık?
 
 const accountNameInput = document.getElementById("accountNameInput");
 const passwordInput = document.getElementById("passwordInput");
@@ -320,7 +355,13 @@ function updateInventoryUI() {
         const slot = document.createElement("div");
         slot.className = "inv-slot";
         slot.dataset.index = i;
-        
+        // Eşya şu an ticarette mi kontrol et
+        if (currentTradeSession && 
+            currentTradeSession.myOffer.items.some(offer => offer.invIndex === i)) 
+        {
+            slot.classList.add("in-trade");
+        }
+        // --- YENİ GÜNCELLEME SONU ---
         if (item) {
             let iconPath = '';
             
@@ -1576,6 +1617,7 @@ function resetUpgradeSlot() {
     if (targetActionInvite) {
         targetActionInvite.onclick = () => {
             if (selectedTargetPlayerId && players[selectedTargetPlayerId]) {
+                socket.emit("inviteToParty", selectedTargetPlayerId);
                 // TODO: Sunucuya 'parti daveti' gönder
                 showWarnPanel(`Parti daveti gönderildi: ${players[selectedTargetPlayerId].name} (Henüz kodlanmadı)`);
                 closeTargetPlayerMenu();
@@ -1586,12 +1628,66 @@ function resetUpgradeSlot() {
     if (targetActionTrade) {
         targetActionTrade.onclick = () => {
             if (selectedTargetPlayerId && players[selectedTargetPlayerId]) {
-                // TODO: Sunucuya 'ticaret daveti' gönder
-                showWarnPanel(`Ticaret daveti gönderildi: ${players[selectedLTargetPlayerId].name} (Henüz kodlanmadı)`);
+                // --- GÜNCELLEME ---
+                // Sunucuya 'ticaret daveti' gönder
+                socket.emit("requestTrade", selectedTargetPlayerId);
+                // showWarnPanel(`Ticaret daveti gönderildi: ${players[selectedTargetPlayerId].name} (Henüz kodlanmadı)`); // Eski kod
+                // --- GÜNCELLEME SONU ---
                 closeTargetPlayerMenu();
             }
         };
+
+    if (partyLeaveBtn) {
+        partyLeaveBtn.onclick = leaveParty;
     }
+    if (partyInviteAccept) {
+        partyInviteAccept.onclick = () => {
+            if (currentInviterId) {
+                socket.emit("acceptPartyInvite", { inviterId: currentInviterId });
+                closePartyInvite();
+            }
+        };
+    }
+    if (partyInviteDecline) {
+        partyInviteDecline.onclick = () => {
+            if (currentInviterId) {
+                socket.emit("declinePartyInvite", { inviterId: currentInviterId });
+                closePartyInvite();
+            }
+        };
+    }
+    if (partyInviteDecline) {
+        partyInviteDecline.onclick = () => {
+            if (currentInviterId) {
+                socket.emit("declinePartyInvite", { inviterId: currentInviterId });
+                closePartyInvite();
+            }
+        };
+    }
+
+    // } // <-- BU SATIR SENİN DOSYANDA 1594. SATIRDA OLMALI (veya olmayabilir, if bloğunun bittiği yer)
+
+
+    // --- YENİ: TİCARET DAVET BUTONLARI (BURAYA EKLE) ---
+    if (tradeRequestAccept) {
+        tradeRequestAccept.onclick = () => {
+            if (currentTradeRequesterId) {
+                socket.emit("acceptTrade", currentTradeRequesterId);
+                closeTradeRequest();
+            }
+        };
+    }
+    
+    if (tradeRequestDecline) {
+        tradeRequestDecline.onclick = () => {
+             if (currentTradeRequesterId) {
+                socket.emit("declineTrade", currentTradeRequesterId);
+                closeTradeRequest();
+            }
+        };
+    }
+    }
+
 
 // Demirci paneli eventlerini (sürükle-bırak, tıkla) ayarlar
 function setupBlacksmithListeners() {
@@ -1638,6 +1734,101 @@ function handleBlacksmithDrop(e) {
     // Tüm UI mantığını (icon, info, button) yeni fonksiyona devret
     updateBlacksmithUI(item, inventoryIndex);
     // --- GÜNCELLEME SONU ---
+}
+
+function showPartyInvite(data) {
+    if (!partyInvitePanel) return;
+    currentInviterId = data.inviterId;
+    document.getElementById("partyInviteMessage").textContent = `Oyuncu '${data.inviterName}' sizi partisine davet ediyor.`;
+    partyInvitePanel.classList.remove("hidden");
+    
+    // Diğer açık menüleri kapat
+    closeTargetPlayerMenu();
+}
+
+function closePartyInvite() {
+    currentInviterId = null;
+    partyInvitePanel.classList.add("hidden");
+}
+
+function leaveParty() {
+    socket.emit("leaveParty");
+}
+
+// =================================================================
+// ### HATA BURADA OLABİLİR (1) ###
+// Bu fonksiyonun ekli olduğundan emin ol
+// =================================================================
+function kickPlayer(targetPlayerId) {
+    socket.emit("kickFromParty", targetPlayerId);
+}
+
+// =================================================================
+// ### HATA BURADA OLABİLİR (2) ###
+// Bu fonksiyonun 'kickButton' satırının 'onclick' içerdiğinden emin ol
+// Gerekirse bu fonksiyonun tamamını kopyalayıp eskisiyle değiştir:
+// =================================================================
+function updatePartyUI() {
+    if (!myParty || myParty.members.length <= 1) {
+        partyPanel.classList.add("hidden"); // Parti yoksa veya tek kişiyse paneli gizle
+        return;
+    }
+    
+    partyPanel.classList.remove("hidden");
+    partyMemberList.innerHTML = ""; // Listeyi temizle
+    
+    const amILeader = myParty.leader === mySocketId;
+
+    myParty.members.forEach(memberId => {
+        const member = players[memberId];
+        if (!member) return; 
+
+        const isLeader = myParty.leader === memberId;
+        const isMe = memberId === mySocketId;
+        
+        // --- BURASI DEĞİŞTİ (HTML metni yerine element oluşturma) ---
+        
+        // 1. Ana üye kutusunu oluştur
+        const memberDiv = document.createElement("div");
+        memberDiv.className = isLeader ? "party-member leader" : "party-member normal";
+        
+        // 2. (GEREKİRSE) Atma Butonunu Oluştur
+        if (amILeader && !isMe) {
+            const kickButton = document.createElement("button");
+            kickButton.className = "party-kick-btn";
+            kickButton.title = "At";
+            kickButton.textContent = "X";
+            
+            // ### ÇÖZÜM: Olayı metin olarak değil, doğrudan ata ###
+            kickButton.onclick = () => {
+                kickPlayer(memberId);
+            };
+            
+            memberDiv.appendChild(kickButton); // Butonu üye kutusuna ekle
+        }
+
+        // 3. İsim elementini oluştur ve ekle
+        const nameDiv = document.createElement("div");
+        nameDiv.className = "party-member-name";
+        nameDiv.textContent = `${isLeader ? '★ ' : ''}${member.name}`;
+        memberDiv.appendChild(nameDiv);
+
+        // 4. HP Bar elementlerini oluştur ve ekle
+        const barDiv = document.createElement("div");
+        barDiv.className = "party-member-bar";
+        
+        const hpDiv = document.createElement("div");
+        hpDiv.className = "hp";
+        hpDiv.style.width = `${(member.hp / member.maxHp) * 100}%`;
+        
+        barDiv.appendChild(hpDiv);
+        memberDiv.appendChild(barDiv);
+
+        // 5. Tamamlanan üye kutusunu listeye ekle
+        partyMemberList.appendChild(memberDiv);
+        
+        // --- DEĞİŞİKLİK SONU ---
+    });
 }
 
 /**
@@ -1924,7 +2115,7 @@ function updateSellPanelUI() {
 function addMessageToChat(data) {
     if (!chatMessages) return;
 
-    const { type = 'general', sender, message } = data;
+    const { type = 'general', sender, message, target } = data;
     
     const msgDiv = document.createElement("div");
     msgDiv.classList.add("chat-msg");
@@ -1937,8 +2128,25 @@ function addMessageToChat(data) {
     } else if (type === 'error') {
         msgDiv.classList.add("error");
         htmlContent = `[Hata] ${message}`;
+        
+    // =================================================================
+    // ### YENİ EKLENEN FISILTI BLOKLARI ###
+    // =================================================================
+    } else if (type === 'whisper_sent') {
+        msgDiv.classList.add("whisper"); // Yeni CSS sınıfı
+        // Gönderdiğimiz fısıltı (hedef oyuncunun adını gösterir)
+        htmlContent = `<strong>-> [${target}]:</strong> ${message}`;
+        
+    } else if (type === 'whisper_received') {
+        msgDiv.classList.add("whisper"); // Yeni CSS sınıfı
+        // Aldığımız fısıltı (gönderen oyuncunun adını gösterir)
+        htmlContent = `<strong>[${sender}] ->:</strong> ${message}`;
+    // =================================================================
+    // ### YENİ BLOKLAR SONU ###
+    // =================================================================
+
     } else { // 'general'
-        // Sunucudan gelen mesaj (Zaten 'sender' içeriyor)
+        // Normal genel sohbet
         htmlContent = `<strong>${sender}:</strong> ${message}`;
     }
     
@@ -2007,6 +2215,12 @@ function setupInputListeners() {
                 chatInput.blur();
                 return;
             }
+
+            if (partyInvitePanel && !partyInvitePanel.classList.contains("hidden")) {
+                closePartyInvite();
+                return;
+            }
+            
             
             // 2. Öncelik: Açık panelleri kapat (birini bulduğu an durur)
             // (NOT: Bu elementlerin en üstte tanımlı olması gerekir)
@@ -2068,22 +2282,43 @@ function setupInputListeners() {
             socket.emit("attack");
             e.preventDefault();
         }
+
+        // =======================================================
+        // ### DÜZELTME: EKSİK KISAYOL KODU ###
+        // =======================================================
+        if (ACTION_SLOT_KEYS.includes(key)) {
+            handleSkillUse(key); // Fonksiyonu çağır
+            e.preventDefault();
+        }
+        // =======================================================
+        // ### DÜZELTME SONU ###
+        // =======================================================
+
        // Panel tuşları
        if (key === 'i') {
-            if (inventoryPanel) inventoryPanel.classList.toggle("hidden");
+            if (inventoryPanel) {
+                inventoryPanel.classList.toggle("hidden");
+            }
             e.preventDefault();
         }
         if (key === 'k') {
-            toggleSkillPanel();
+            if (skillPanel) { // <-- DEĞİŞTİ
+                skillPanel.classList.toggle("hidden");
+                // Panel açılıyorsa UI'ı güncelle
+                if (!skillPanel.classList.contains("hidden")) { 
+                    updateSkillPanelUI();
+                }
+            }
             e.preventDefault();
         }
         if (key === 'c') {
-            toggleCharacterPanel();
-            e.preventDefault();
-        }
-        // Aksiyon çubuğu tuşları
-        if (ACTION_SLOT_KEYS.includes(key)) { 
-            handleSkillUse(key);
+            if (characterPanel) { // <-- DEĞİŞTİ
+                characterPanel.classList.toggle("hidden");
+                // Panel açılıyorsa UI'ı güncelle
+                if (!characterPanel.classList.contains("hidden")) { 
+                    updateCharacterPanelUI();
+                }
+            }
             e.preventDefault();
         }
     });
@@ -2662,6 +2897,7 @@ function gameLoop() {
     updateCharacterPanelUI();
     updateBuffsUI();
     
+    
     requestAnimationFrame(gameLoop);
 }
 // --------------------------- GRAFİK YÜKLEME ---------------------------
@@ -2813,7 +3049,288 @@ socket.on("characterJoined", () => {
     hideAllScreensAndStartGame();
 });
 // --- ACCOUNT LOGIC END ---
+// --- YENİ: TİCARET FONKSİYONLARI ---
 
+/**
+ * Ticaret daveti penceresini gösterir.
+ */
+function showTradeRequest(data) {
+    currentTradeRequesterId = data.requesterId;
+    tradeRequestMessage.textContent = `Oyuncu '${data.requesterName}' sizinle ticaret yapmak istiyor.`;
+    tradeRequestPanel.classList.remove("hidden");
+    
+    // Diğer davetleri kapat
+    closePartyInvite();
+}
+
+function closeTradeRequest() {
+    currentTradeRequesterId = null;
+    tradeRequestPanel.classList.add("hidden");
+}
+
+/**
+ * Ana ticaret penceresini açar ve DOM dinleyicilerini ayarlar.
+ */
+function openTradeWindow(data) {
+    currentTradeSession = data; // Sunucudan gelen ilk veriyi sakla
+    
+    // Davet penceresini kapat
+    closeTradeRequest();
+    
+    // İsimleri ayarla
+    myTradeName.textContent = players[mySocketId].name;
+    opponentTradeName.textContent = data.opponent.name;
+    
+    // Arayüzü çiz
+    renderTradeWindow();
+    
+    // Dinleyicileri (yeniden) ayarla
+    tradeCancelBtn.onclick = closeTradeWindow;
+    
+    // Yang girişi
+    myTradeYang.onchange = (e) => {
+        let amount = parseInt(e.target.value) || 0;
+        const myYang = players[mySocketId]?.yang || 0;
+        if (amount > myYang) {
+            amount = myYang;
+            e.target.value = amount;
+        }
+        if (amount < 0) amount = 0;
+        
+        // Sadece miktar değiştiyse sunucuya haber ver
+        if (currentTradeSession.myOffer.yang !== amount) {
+            socket.emit("setTradeYang", {
+                tradeId: currentTradeSession.tradeId,
+                amount: amount
+            });
+        }
+    };
+    
+    // Kabul/Onay butonu
+    tradeAcceptBtn.onclick = () => {
+        if (!currentTradeSession) return;
+        
+        const myLock = currentTradeSession.myId === currentTradeSession.playerA_id ? currentTradeSession.playerA_locked : currentTradeSession.playerB_locked;
+        const opLock = currentTradeSession.myId === currentTradeSession.playerA_id ? currentTradeSession.playerB_locked : currentTradeSession.playerA_locked;
+
+        // GÜNCEL MANTIK: İki aşamalı onay
+        if (myLock && opLock) {
+            // 2. Aşama: Her iki taraf da kilitliyse, son onayı gönder
+            socket.emit("confirmTrade", { tradeId: currentTradeSession.tradeId });
+            tradeAcceptBtn.disabled = true; // Sunucudan yanıt gelene kadar kilitle
+        } else if (!myLock) {
+            // 1. Aşama: Kilitli değilse, teklifi kilitle
+            socket.emit("lockTrade", { tradeId: currentTradeSession.tradeId });
+            tradeAcceptBtn.disabled = true; // Sunucudan yanıt gelene kadar kilitle
+        }
+    };
+
+    // Pencereyi göster
+    tradePanel.classList.remove("hidden");
+}
+
+function closeTradeUI() {
+    // Oturumu sıfırla
+    currentTradeSession = null;
+    
+    // Pencereyi gizle
+    if (tradePanel) {
+        tradePanel.classList.add("hidden"); 
+    }
+    
+    // Diğer elementleri temizle
+    if (tradeConfirmStatus) {
+        tradeConfirmStatus.textContent = "";
+    }
+    if (tradeAcceptBtn) {
+        tradeAcceptBtn.disabled = false; // Butonu yeniden aktifleştir
+    }
+    
+    // Envanterdeki "in-trade" sınıfını temizle
+    updateInventoryUI();
+    
+    // Yang alanını temizle/sıfırla
+    if (myTradeYang) {
+        myTradeYang.value = 0;
+    }
+    
+    console.log("Ticaret UI temizlendi ve pencere gizlendi.");
+}
+
+
+/**
+ * Ticaret penceresini kapatır ve oturumu sıfırlar.
+ */
+function closeTradeWindow() {
+    if (currentTradeSession) {
+        // Kullanıcı butona bastığı için sunucuya iptal ettiğimizi bildir
+        // Sunucu bu sinyali aldıktan sonra "tradeCancelled" eventini geri gönderecektir.
+        socket.emit("cancelTrade"); 
+        
+        // Bu yüzden burada closeTradeUI() çağırmaya gerek yok,
+        // tradeCancelled eventinin gelmesini bekliyoruz.
+        // Ancak bu satırları koyarsak daha hızlı kapanır:
+        closeTradeUI(); // Hemen kapat, sunucudan onay gelince tekrar temizler/kapatır (fark etmez)
+    } else {
+        closeTradeUI(); // Zaten bir oturum yoksa yine de kapat
+    }
+}
+/**
+ * currentTradeSession verisine göre ticaret penceresini günceller.
+ */
+// client.js (renderTradeWindow fonksiyonunun tamamı)
+
+function renderTradeWindow() {
+    if (!currentTradeSession) return;
+    
+    const trade = currentTradeSession;
+    const myId = trade.myId;
+    
+    // Rolleri Doğru Hesaplama
+    const isPlayerA = trade.playerA_id === myId;
+    const myLock = isPlayerA ? trade.playerA_locked : trade.playerB_locked;
+    const opLock = isPlayerA ? trade.playerB_locked : trade.playerA_locked;
+    
+    // Onay Durumlarını Hesaplama
+    const myConfirmed = isPlayerA ? trade.playerA_confirmed : trade.playerB_confirmed;
+    const opConfirmed = isPlayerA ? trade.playerB_confirmed : trade.playerA_confirmed; 
+    
+    // 1. Kilit (Yeşil/Kırmızı Işık) Durumları
+    myTradeStatus.classList.toggle("locked", myLock);
+    opponentTradeStatus.classList.toggle("locked", opLock);
+    
+    // 2. Yang Alanları
+    myTradeYang.value = trade.myOffer.yang;
+    opponentTradeYang.value = trade.opponentOffer.yang;
+    
+    // Yang girişi: Eğer kilitliyse (onayladıysa) Yang'ı değiştiremez
+    myTradeYang.disabled = myLock;
+    
+    // 3. Eşya Gridleri
+    
+    // Benim Grid'im (Sürükle-Bırak ve Tıklama)
+    myTradeGrid.innerHTML = "";
+    const myItems = trade.myOffer.items;
+    for (let i = 0; i < 12; i++) {
+        const itemOffer = myItems[i];
+        const slot = document.createElement("div");
+        slot.className = "trade-slot";
+        slot.dataset.tradeIndex = i;
+        
+        if (itemOffer) {
+            const item = itemOffer.item;
+            let iconPath = '';
+            if (item.iconSrc) {
+                if (item.type === 'weapon') iconPath = `/assets/weapons/${item.iconSrc}`;
+                else iconPath = `/assets/armors/${item.iconSrc}`;
+            }
+            slot.innerHTML = `<img src="${iconPath || getItemSVG(item.icon)}" alt="${item.name}">`;
+            
+            // Tıklayınca geri çekme (Eğer kilitli DEĞİLSE)
+            if (!myLock) {
+                slot.style.cursor = "pointer";
+                slot.onclick = () => {
+                    socket.emit("removeTradeItem", {
+                        tradeId: trade.tradeId,
+                        tradeSlotIndex: i
+                    });
+                };
+            }
+        } else {
+            // Boş slot: Sürükle-Bırak hedefi (Eğer kilitli DEĞİLSE)
+            if (!myLock) {
+                slot.ondragover = allowDrop;
+                slot.ondrop = handleTradeItemDrop;
+            }
+        }
+        myTradeGrid.appendChild(slot);
+    }
+    
+    // Karşı Tarafın Grid'i (Sadece Gösterim)
+    opponentTradeGrid.innerHTML = "";
+    const opItems = trade.opponentOffer.items;
+     for (let i = 0; i < 12; i++) {
+        const itemOffer = opItems[i];
+        const slot = document.createElement("div");
+        slot.className = "trade-slot";
+        if (itemOffer) {
+            const item = itemOffer.item;
+            let iconPath = '';
+            if (item.iconSrc) {
+                if (item.type === 'weapon') iconPath = `/assets/weapons/${item.iconSrc}`;
+                else iconPath = `/assets/armors/${item.iconSrc}`;
+            }
+            slot.innerHTML = `<img src="${iconPath || getItemSVG(item.icon)}" alt="${item.name}">`;
+        }
+        opponentTradeGrid.appendChild(slot);
+    }
+    
+    // 4. Kabul/Onay Butonu Durumu
+    tradeAcceptBtn.disabled = false; // <<< KRİTİK: Her zaman başlangıçta açılır
+    tradeConfirmStatus.textContent = ""; 
+    tradeAcceptBtn.style.background = ""; 
+
+    if (myLock && opLock) {
+        // Her iki taraf da kilitli: Final Onay Bekleniyor
+        tradeAcceptBtn.textContent = "Ticareti Onayla";
+        tradeAcceptBtn.style.background = "#004499"; 
+        tradeAcceptBtn.disabled = myConfirmed; 
+        
+        if(myConfirmed) {
+             tradeAcceptBtn.textContent = "Onaylandı, Bekleniyor";
+             tradeAcceptBtn.style.background = "#555";
+             tradeConfirmStatus.textContent = "Onaylandı. Karşı taraf bekleniyor...";
+        }
+
+    } else if (myLock) {
+        // Ben kilitledim, karşı taraf bekleniyor
+        tradeAcceptBtn.textContent = "Karşı Taraf Kabulü Bekleniyor...";
+        tradeAcceptBtn.disabled = true;
+    } else {
+        // Ben kilitlemedim: İlk Kabul (opLock durumuna bakılmaksızın)
+        // Eğer B kilitlediyse (opLock=true), A buraya düşmeli ve "Kabul Et"i görmeli.
+        tradeAcceptBtn.textContent = "Kabul Et";
+    }
+    
+    // 5. Envanter UI'ını güncelle
+    updateInventoryUI();
+}
+
+/**
+ * Envanterden ticaret penceresine eşya sürüklendiğinde çalışır.
+ */
+function handleTradeItemDrop(e) {
+    e.preventDefault();
+    if (!currentTradeSession) return;
+    
+    let data = null;
+    try {
+        const rawData = e.dataTransfer.getData("text/inventory");
+        if (!rawData) return;
+        data = JSON.parse(rawData);
+    } catch (error) { return; }
+
+    if (!data || data.type !== "inventory") return;
+
+    const inventoryIndex = parseInt(data.index);
+    const item = inventory[inventoryIndex];
+
+    if (!item) return;
+    
+    // Tüketilebilir (pot vb.) ticareti engelle
+    if (item.type === 'consumable') {
+        showWarnPanel("Tüketilebilir eşyalar (pot vb.) ticarete konulamaz.");
+        return;
+    }
+
+    // Sunucuya "bu item'ı ticarete ekle" isteği gönder
+    socket.emit("addTradeItem", {
+        tradeId: currentTradeSession.tradeId,
+        inventoryIndex: inventoryIndex
+    });
+}
+
+// --- TİCARET FONKSİYONLARI SONU ---
 // --------------------------- SOCKET ---------------------------
 socket.on("connect", () => {
   mySocketId = socket.id;
@@ -2863,6 +3380,81 @@ socket.on("gameState", (data) => {
     }
   }
   // --- GÜNCELLEME SONU ---
+});
+
+
+// --- YENİ: TİCARET SOCKET DİNLEYİCİLERİ ---
+
+socket.on("tradeRequestReceived", (data) => {
+    // data = { requesterId: '...', requesterName: '...' }
+    showTradeRequest(data);
+});
+
+socket.on("tradeRequestDeclined", (data) => {
+    // data = { message: '...' }
+    showWarnPanel(data.message);
+});
+
+socket.on("tradeWindowOpen", (data) => {
+    // data = { tradeId: ..., myId: ..., opponent: {...}, ... }
+    openTradeWindow(data);
+});
+
+socket.on("tradeOfferUpdate", (data) => {
+    // data = { myOffer: {...}, opponentOffer: {...} }
+    if (currentTradeSession) {
+        currentTradeSession.myOffer = data.myOffer;
+        currentTradeSession.opponentOffer = data.opponentOffer;
+        renderTradeWindow();
+    }
+});
+
+socket.on("tradeSuccess", (data) => {
+    // data = { message: "..." }
+    
+    // 1. Bildirimi göster
+    showNotification({ title: "Ticaret Başarılı", message: data.message });
+    
+    // 2. KAPANMA MEKANİZMASI (Try-Catch ile kesinleştirme)
+    try {
+        currentTradeSession = null;
+        // KRİTİK: Eğer tanımlıysa, gizle.
+        if (tradePanel) tradePanel.classList.add("hidden"); 
+        tradeConfirmStatus.textContent = "";
+        
+        // 3. Envanteri güncelle
+        updateInventoryUI();
+        lastInventoryState = "[]"; 
+        lastEquipmentState = "{}";
+        
+    } catch(e) {
+        console.error("tradeSuccess: Kapanma sırasında hata!", e);
+        // Hata durumunda bile pencereyi kapatmaya zorla
+        document.getElementById("tradePanel")?.classList.add("hidden");
+    }
+});
+
+socket.on("tradeCancelled", (data) => {
+    // data = { message: "..." }
+    
+    // 1. Bildirimi göster
+    showNotification({ title: "Ticaret İptal", message: data.message });
+    
+    // 2. KAPANMA MEKANİZMASI (Try-Catch ile kesinleştirme)
+     try {
+        currentTradeSession = null;
+        // KRİTİK: Eğer tanımlıysa, gizle.
+        if (tradePanel) tradePanel.classList.add("hidden"); 
+        tradeConfirmStatus.textContent = "";
+        
+        // 3. Envanteri güncelle
+        updateInventoryUI();
+        lastInventoryState = "[]";
+        
+    } catch(e) {
+        console.error("tradeCancelled: Kapanma sırasında hata!", e);
+        document.getElementById("tradePanel")?.classList.add("hidden");
+    }
 });
 
 
@@ -3039,3 +3631,58 @@ socket.on("skillError", (data) => {
     showWarnPanel(data.message);
 });
 
+socket.on("partyInviteReceived", (data) => {
+    // data = { inviterId: '...', inviterName: '...' }
+    showPartyInvite(data);
+});
+
+socket.on("partyDataUpdate", (data) => {
+    // data = { id: '...', leader: '...', members: [...] } VEYA null
+    myParty = data;
+
+    updatePartyUI();
+});
+
+/**
+ * Bir taraf teklifi kilitlediğinde (veya kilit açıldığında) tetiklenir.
+ * "Kabul Et" butonunu "Ticareti Onayla"ya dönüştürmek için KRİTİKTİR.
+ */
+socket.on("tradeLockUpdate", (data) => {
+    // data = { playerA_locked: bool, playerB_locked: bool }
+    if (currentTradeSession) {
+        currentTradeSession.playerA_locked = data.playerA_locked;
+        currentTradeSession.playerB_locked = data.playerB_locked;
+        
+        // Kilitler açıldıysa (örn: biri teklifi değiştirdi),
+        // "Onay bekliyor..." yazısını temizle
+        if (!data.playerA_locked || !data.playerB_locked) {
+            tradeConfirmStatus.textContent = "";
+        }
+        
+        // KRİTİK EKLEME: renderTradeWindow çağrılmadan önce butonu zorla etkinleştir.
+        // renderTradeWindow içindeki mantık, gerekiyorsa onu tekrar devre dışı bırakacaktır.
+        tradeAcceptBtn.disabled = false; 
+
+        // Arayüzü yeni kilit durumuna göre güncelle
+        renderTradeWindow();
+    }
+});
+
+socket.on("tradeConfirmUpdate", (data) => {
+    // data = { message: "Karşı taraf son onayı verdi..." } VEYA { message: "Onaylandı. Karşı taraf bekleniyor..." }
+    if (tradeConfirmStatus) {
+        // Bu mesajı alt bilgi alanında göster
+        tradeConfirmStatus.textContent = data.message; 
+    }
+    
+    // Eğer karşı taraf onayladıysa, benim butonu açar ve UI'ı günceller
+    if (data.message.includes("Karşı taraf son onayı verdi")) {
+        tradeAcceptBtn.disabled = false;
+        renderTradeWindow();
+    }
+});
+
+/**
+ * Bir taraf teklifi (item/yang) değiştirdiğinde tetiklenir.
+ * Karşı tarafın ne koyduğunu görmek için KRİTİKTİR.
+ */

@@ -16,6 +16,23 @@ const characterSelectionScreen = document.getElementById("characterSelectionScre
 const characterListEl = document.getElementById("characterList");
 const createCharBtn = document.getElementById("createCharBtn");
 const selectCharBtn = document.getElementById("selectCharBtn");
+const chatContainer = document.getElementById("chatContainer");
+const chatMessages = document.getElementById("chatMessages");
+const chatInput = document.getElementById("chatInput");
+const blacksmithPanel = document.getElementById("blacksmithPanel");
+const upgradeSlot = document.getElementById("upgradeSlot");
+const upgradeItemName = document.getElementById("upgradeItemName");
+const upgradeCost = document.getElementById("upgradeCost");
+const upgradeSuccessChance = document.getElementById("upgradeSuccessChance");
+const upgradeButton = document.getElementById("upgradeButton");
+let itemInUpgradeSlot = null; // { index: <invIndex>, item: <itemObj> }
+const targetPlayerMenu = document.getElementById("targetPlayerMenu");
+const targetPlayerName = document.getElementById("targetPlayerName");
+const targetPlayerMenuCloseBtn = document.getElementById("targetPlayerMenuCloseBtn");
+const targetActionWhisper = document.getElementById("targetActionWhisper");
+const targetActionInvite = document.getElementById("targetActionInvite");
+const targetActionTrade = document.getElementById("targetActionTrade");
+let selectedTargetPlayerId = null; // Tıkladığımız oyuncunun ID'sini tutar
 
 const accountNameInput = document.getElementById("accountNameInput");
 const passwordInput = document.getElementById("passwordInput");
@@ -32,6 +49,8 @@ const kingdomSelection = document.getElementById("kingdomSelection");
 let notificationTimer = null;
 let warnPanelTimer = null; 
 let playerChoices = { name: "", kingdom: "", class: "" };
+let lastInventoryState = "[]";
+let lastEquipmentState = "{}";
 
 const ACTION_SLOT_KEYS = ['1', '2', '3', '4', '5', '6']; 
 let actionBarSlots = [null, null, null, null, null, null]; 
@@ -269,6 +288,18 @@ const ITEM_DB = {
     5101: { id: 5101, name: "Pençe Kaskı", type: "helmet", icon: "Helmet", def: 7, forClass: "lycan", requiredLevel: 1 },
 };
 
+const UPGRADE_DATA = {
+    0: { cost: 5000,    successRate: 1.00, weaponDmg: 3, armorDef: 2 },
+    1: { cost: 10000,   successRate: 0.90, weaponDmg: 3, armorDef: 2 },
+    2: { cost: 25000,   successRate: 0.80, weaponDmg: 3, armorDef: 2 },
+    3: { cost: 50000,   successRate: 0.70, weaponDmg: 4, armorDef: 3 },
+    4: { cost: 100000,  successRate: 0.60, weaponDmg: 4, armorDef: 3 },
+    5: { cost: 250000,  successRate: 0.50, weaponDmg: 4, armorDef: 3 },
+    6: { cost: 500000,  successRate: 0.40, weaponDmg: 5, armorDef: 5 },
+    7: { cost: 1000000, successRate: 0.30, weaponDmg: 5, armorDef: 5 },
+    8: { cost: 2500000, successRate: 0.20, weaponDmg: 6, armorDef: 6 }
+};
+
 function getItemSVG(icon) {
     return SVG_ICONS[icon] || SVG_ICONS["Question"];
 }
@@ -330,6 +361,12 @@ function updateInventoryUI() {
                 quantitySpan.textContent = item.quantity;
                 slot.appendChild(quantitySpan);
             }
+            if (item.plus && item.plus > 0) { 
+                        const plusSpan = document.createElement("span");
+                        plusSpan.classList.add("item-plus");
+                        plusSpan.textContent = `+${item.plus}`;
+                        slot.appendChild(plusSpan);
+                    }
             
             // Seviye şartını düz metin olarak tooltipe ekle
             if (item.requiredLevel) {
@@ -712,24 +749,137 @@ const assetDefinitions = {
         walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
         idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
         attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
-        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 1, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
         hitbox: { width: 40, height: 40 }
     },
-
-    wolf: {
-        src: "/assets/mobs/wolfsheet2.png", 
-        frameWidth: 64,  
-        frameHeight: 64,
-        pivotX: 32, 
-        pivotY: 32,
-        hitbox: { width: 30, height: 30 },
-        animations: {
-            walk:   { startFrameX: 3, totalFrames: 5, rows: 4, speed: 6 }, 
-            idle:   { startFrameX: 0, totalFrames: 3, rows: 4, speed: 25 },
-            attack: { startFrameX: 0, totalFrames: 5, rows: 4, speed: 5, rowOffset: 4 }, 
-            hurt:   { startFrameX: 5, totalFrames: 1, rows: 4, speed: 10, rowOffset: 4 }, 
-        }
+    pig: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 30, height: 30 } // Domuz için hitbox'ı küçülttük
     },
+    boar: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 35, height: 35 } // Yaban Domuzu için hitbox
+    },
+    alphaWolf: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    direWolf: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 45, height: 45 } // Biraz daha büyük
+    },
+    shadowWolf: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    rabidWolf: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    ancientWolf: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 50, height: 50 } // En büyük kurt
+    },
+    spider: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    giantSpider: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 60, height: 60 } // Büyük örümcek
+    },
+    // --- TÜM MOBLAR ORC OLARAK AYARLANDI (WOLF DAHİL) ---
+    wolf: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    snake: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+       hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    demon: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    spirit: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    golem: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    scorpion: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    desertSnake: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    iceGolem: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    yeti: {
+        walk: { src: "/assets/mobs/orc_walk.png", frames: 8, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        idle: { src: "/assets/mobs/orc_idle.png", frames: 2, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 },
+        attack: { src: "/assets/mobs/orc_attack.png", frames: 5, rows: 4, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32 }, 
+        hurt: { src: "/assets/mobs/orc_hurt.png", frames: 5, rows: 1, frameWidth: 64, frameHeight: 64, pivotX: 32, pivotY: 32, speed: 10 },
+        hitbox: { width: 40, height: 40 }
+    },
+    // --- DEĞİŞİKLİK SONU ---
 };
 
 const directionRowMap = { up: 0, left: 1, down: 2, right: 3 };
@@ -1041,6 +1191,11 @@ function onNpcClick(npc) {
         showShopWindow(npc);
         return; 
     }
+
+    if (npc.asset === "blacksmith") {
+        openBlacksmithWindow(); // Yeni fonksiyonu çağır
+        return;
+    }
     
     if (npc.asset === me.class) {
         if (me.level >= 5 && me.skillSet === null) {
@@ -1069,6 +1224,32 @@ function handleWorldClick(e) {
     const worldX = mouseX + camera.x;
     const worldY = mouseY + camera.y;
 
+    // --- YENİ: OYUNCU TIKLAMA KONTROLÜ ---
+    // (NPC'den ÖNCE kontrol et, çünkü üst üste olabilirler)
+    let clickedPlayer = null;
+    for (const id in players) {
+        if (id === mySocketId) continue; // Kendimiz hariç
+        const p = players[id];
+        if (me.map !== p.map || !p.isAlive) continue; // Sadece aynı haritadaki canlı oyuncular
+
+        // Basit bir kutu çarpışması (hitbox)
+        if (worldX >= p.x && 
+            worldX <= p.x + p.width &&
+            worldY >= p.y && 
+            worldY <= p.y + p.height) 
+        {
+            clickedPlayer = p;
+            break; 
+        }
+    }
+    
+    if (clickedPlayer) {
+        openTargetPlayerMenu(clickedPlayer);
+        return; // Oyuncuya tıkladıysak NPC'yi veya yeri arama
+    }
+    // --- YENİ KOD SONU ---
+
+    // --- NPC TIKLAMA KONTROLÜ (Değişmedi) ---
     let clickedNpc = null;
     for (const id in npcs) {
         const npc = npcs[id];
@@ -1086,6 +1267,10 @@ function handleWorldClick(e) {
 
     if (clickedNpc) {
         onNpcClick(clickedNpc);
+    } else if (!clickedPlayer) {
+         // Eğer hiçbir şeye (NPC veya Oyuncu) tıklamadıysak,
+         // açık olan hedef menüsünü kapat.
+         closeTargetPlayerMenu();
     }
 }
 
@@ -1254,7 +1439,7 @@ function handleSkillDrop(e, slotIndex) {
 }
 /**
  * Envanterdeki tüketilebilir bir eşyayı (pot) kullanır.
- * @param {number} inventoryIndex - Envanterdeki eşyanın indexi.
+ * @param {number} inventoryIndex - Envanterdeki eşyayın indexi.
  */
 function handleConsumableUse(inventoryIndex) {
     const item = inventory[inventoryIndex];
@@ -1264,6 +1449,195 @@ function handleConsumableUse(inventoryIndex) {
         itemId: item.id,
         inventoryIndex: inventoryIndex
     });
+}
+
+function openBlacksmithWindow() {
+    resetUpgradeSlot();
+    blacksmithPanel.classList.remove("hidden");
+    // Diğer panelleri kapat (opsiyonel ama önerilir)
+    document.getElementById("inventoryPanel").classList.add("hidden");
+    document.getElementById("shopPanel").classList.add("hidden");
+}
+
+/**
+ * Demirci panelini verilen eşyaya göre günceller.
+ * Eğer eşya +9 ise veya geçersizse slotu kilitler.
+ */
+function updateBlacksmithUI(item, inventoryIndex) {
+    if (!item) {
+        resetUpgradeSlot();
+        return;
+    }
+
+    // 1. Global değişkeni ayarla
+    itemInUpgradeSlot = { index: inventoryIndex, item: item };
+
+    // 2. Tipi ve seviyeyi kontrol et
+    const itemType = item.type;
+    const currentPlus = item.plus || 0;
+
+    if (itemType !== 'weapon' && itemType !== 'armor' && itemType !== 'helmet' && itemType !== 'shield') {
+        showWarnPanel("Sadece Silah, Zırh, Kask ve Kalkanlar yükseltilebilir.");
+        resetUpgradeSlot();
+        return;
+    }
+
+    // 3. Slotun görselini güncelle
+    const iconPath = item.iconSrc ? (itemType === 'weapon' ? `/assets/weapons/${item.iconSrc}` : `/assets/armors/${item.iconSrc}`) : null;
+    if (iconPath) {
+        upgradeSlot.innerHTML = `<img src="${iconPath}" alt="${item.name}">`;
+    } else {
+        upgradeSlot.innerHTML = getItemSVG(item.icon); // SVG fallback
+    }
+    upgradeSlot.classList.add("occupied");
+    upgradeSlot.dataset.tooltip = item.name;
+
+    // 4. Maksimum seviyeye ulaştı mı?
+    if (currentPlus >= 9) {
+        const itemName = item.name.split(' +')[0];
+        upgradeItemName.textContent = `${itemName} (+9 Maksimum Seviye)`;
+        upgradeCost.textContent = "Gerekli Yang: ---";
+        upgradeSuccessChance.textContent = "Başarı Şansı: ---";
+        upgradeButton.disabled = true;
+        upgradeButton.textContent = "MAKS. SEVİYE";
+        return; // +9 ise daha fazla bilgiye gerek yok
+    }
+
+    // 5. Info panelini (sonraki seviye için) güncelle
+    const upgradeInfo = UPGRADE_DATA[currentPlus];
+    const itemName = item.name.split(' +')[0]; // Ana adı al
+    upgradeItemName.textContent = `${itemName} (+${currentPlus} -> +${currentPlus + 1})`;
+    upgradeCost.textContent = `Gerekli Yang: ${upgradeInfo.cost.toLocaleString()}`;
+    upgradeSuccessChance.textContent = `Başarı Şansı: ${upgradeInfo.successRate * 100}%`;
+    
+    // 6. Butonu aktifleştir (eğer parası varsa)
+    const me = players[mySocketId];
+    if (me && me.yang >= upgradeInfo.cost) {
+        upgradeButton.disabled = false;
+        upgradeButton.textContent = "YÜKSELT";
+    } else {
+        upgradeButton.disabled = true;
+        upgradeButton.textContent = "YÜKSELT";
+        upgradeCost.textContent += " (Yetersiz Yang)";
+    }
+}
+
+function openTargetPlayerMenu(player) {
+    if (!player || player.id === mySocketId) return; // Kendimize tıklayamayız
+    
+    selectedTargetPlayerId = player.id;
+    targetPlayerName.textContent = `${player.name} (Lv. ${player.level})`;
+    targetPlayerMenu.classList.remove("hidden");
+    
+    // TODO: Eğer oyuncu zaten partideyse "Davet" butonunu gizle/inaktif et
+}
+
+function closeTargetPlayerMenu() {
+    selectedTargetPlayerId = null;
+    targetPlayerMenu.classList.add("hidden");
+}
+
+function closeBlacksmithWindow() {
+    // Eşyayı slottan "iade etmeye" gerek yok, çünkü envanterden hiç çıkmadı.
+    resetUpgradeSlot();
+    blacksmithPanel.classList.add("hidden");
+}
+
+function resetUpgradeSlot() {
+    itemInUpgradeSlot = null;
+    upgradeSlot.innerHTML = "";
+    upgradeSlot.classList.remove("occupied");
+    upgradeItemName.textContent = "---";
+    upgradeCost.textContent = "Gerekli Yang: ---";
+    upgradeSuccessChance.textContent = "Başarı Şansı: ---";
+    upgradeButton.disabled = true;
+    upgradeSlot.dataset.tooltip = "Eşyayı buraya sürükle";
+}
+
+// --- YENİ EKLENDİ (HEDEF MENÜSÜ BUTONLARI) ---
+    if (targetPlayerMenuCloseBtn) {
+        targetPlayerMenuCloseBtn.onclick = closeTargetPlayerMenu;
+    }
+    
+    if (targetActionWhisper) {
+        targetActionWhisper.onclick = () => {
+            if (selectedTargetPlayerId && players[selectedTargetPlayerId]) {
+                const targetName = players[selectedTargetPlayerId].name;
+                
+                // Sohbet kutusunu aç ve fısıltı komutunu hazırla
+                chatInput.focus();
+                chatInput.value = `/w ${targetName} `; // Fısıltı komutu
+                
+                closeTargetPlayerMenu();
+            }
+        };
+    }
+    
+    if (targetActionInvite) {
+        targetActionInvite.onclick = () => {
+            if (selectedTargetPlayerId && players[selectedTargetPlayerId]) {
+                // TODO: Sunucuya 'parti daveti' gönder
+                showWarnPanel(`Parti daveti gönderildi: ${players[selectedTargetPlayerId].name} (Henüz kodlanmadı)`);
+                closeTargetPlayerMenu();
+            }
+        };
+    }
+    
+    if (targetActionTrade) {
+        targetActionTrade.onclick = () => {
+            if (selectedTargetPlayerId && players[selectedTargetPlayerId]) {
+                // TODO: Sunucuya 'ticaret daveti' gönder
+                showWarnPanel(`Ticaret daveti gönderildi: ${players[selectedLTargetPlayerId].name} (Henüz kodlanmadı)`);
+                closeTargetPlayerMenu();
+            }
+        };
+    }
+
+// Demirci paneli eventlerini (sürükle-bırak, tıkla) ayarlar
+function setupBlacksmithListeners() {
+    // Kapatma butonu
+    document.getElementById("blacksmithPanelCloseBtn").onclick = closeBlacksmithWindow;
+
+    // Drop alanı
+    upgradeSlot.addEventListener("dragover", allowDrop); // (allowDrop zaten var)
+    upgradeSlot.addEventListener("drop", handleBlacksmithDrop);
+
+    // Yükselt butonu
+    upgradeButton.onclick = () => {
+        if (itemInUpgradeSlot) {
+            socket.emit("attemptUpgrade", { inventoryIndex: itemInUpgradeSlot.index });
+            upgradeButton.disabled = true; // İsteği tekrarlamayı engelle
+            upgradeButton.textContent = "Yükseltiliyor...";
+        }
+    };
+}
+
+// Demirci slotuna eşya bırakıldığında çalışır
+function handleBlacksmithDrop(e) {
+    e.preventDefault();
+    if (itemInUpgradeSlot) {
+        showWarnPanel("Demirci slotu zaten dolu.");
+        return;
+    }
+
+    let data = null;
+    try {
+        const rawData = e.dataTransfer.getData("text/inventory");
+        if (!rawData) return;
+        data = JSON.parse(rawData);
+    } catch (error) { return; } 
+
+    if (!data || data.type !== "inventory") return;
+
+    const inventoryIndex = parseInt(data.index);
+    const item = inventory[inventoryIndex];
+
+    if (!item) return;
+
+    // --- YENİ GÜNCELLEME ---
+    // Tüm UI mantığını (icon, info, button) yeni fonksiyona devret
+    updateBlacksmithUI(item, inventoryIndex);
+    // --- GÜNCELLEME SONU ---
 }
 
 /**
@@ -1541,6 +1915,73 @@ function updateSellPanelUI() {
     });
 }
 
+/**
+ * Gelen mesajı alır ve sohbet kutusuna ekler.
+ * type: 'system', 'general', 'error'
+ * sender: (Opsiyonel) Gönderenin adı
+ * message: Mesaj metni
+ */
+function addMessageToChat(data) {
+    if (!chatMessages) return;
+
+    const { type = 'general', sender, message } = data;
+    
+    const msgDiv = document.createElement("div");
+    msgDiv.classList.add("chat-msg");
+    
+    let htmlContent = "";
+
+    if (type === 'system') {
+        msgDiv.classList.add("system");
+        htmlContent = `[Sistem] ${message}`;
+    } else if (type === 'error') {
+        msgDiv.classList.add("error");
+        htmlContent = `[Hata] ${message}`;
+    } else { // 'general'
+        // Sunucudan gelen mesaj (Zaten 'sender' içeriyor)
+        htmlContent = `<strong>${sender}:</strong> ${message}`;
+    }
+    
+    msgDiv.innerHTML = htmlContent;
+    chatMessages.appendChild(msgDiv);
+    
+    // Otomatik olarak en alta kaydır
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+/**
+ * Sohbet giriş kutusuna (chatInput) 'Enter' dinleyicisi ekler.
+ */
+function setupChatListener() {
+    if (!chatInput) return;
+
+    chatInput.addEventListener("keydown", (e) => {
+        // Sadece 'Enter' tuşuna basıldığında
+        if (e.key === "Enter") {
+            e.preventDefault(); // Sayfanın yenilenmesini engelle
+            
+            const message = chatInput.value.trim();
+            
+            if (message.length > 0) {
+                // Mesaj varsa, sunucuya gönder
+                socket.emit("sendChatMessage", { message: message });
+                
+                // Gönderdikten sonra kutuyu temizle
+                chatInput.value = "";
+            }
+            
+            // =================================================================
+            // ### DÜZELTME BURADA ###
+            // Mesaj gönderilsin VEYA gönderilmesin (kutu boşsa),
+            // 'Enter'a basıldığında her zaman odaktan çık (blur).
+            // Bu satır 'if' bloğunun DIŞINDA olmalı.
+            chatInput.blur();
+            // =================================================================
+        }
+    });
+}
+
+// client.js
 function setupInputListeners() {
     if (inputListenersInitialized) {
         console.warn("Input listener'lar zaten kurulmuş. Tekrar kurma engellendi.");
@@ -1553,51 +1994,134 @@ function setupInputListeners() {
     
     window.addEventListener("keydown", (e) => {
         const me = players[mySocketId];
-        if (!me || !me.isAlive) { e.preventDefault(); return; }
+        const key = e.key.toLowerCase(); // Tuşu en başta alalım
 
+        // =================================================================
+        // ### ESC TUŞU MANTIĞI ###
+        // =================================================================
+        if (key === 'escape') {
+            e.preventDefault(); // Varsayılan ESC eylemlerini engelle
+            
+            // 1. Öncelik: Sohbetten çık
+            if (document.activeElement === chatInput) {
+                chatInput.blur();
+                return;
+            }
+            
+            // 2. Öncelik: Açık panelleri kapat (birini bulduğu an durur)
+            // (NOT: Bu elementlerin en üstte tanımlı olması gerekir)
+            if (skillChoiceWindow && !skillChoiceWindow.classList.contains("hidden")) {
+                skillChoiceWindow.classList.add("hidden");
+                return;
+            }
+            if (blacksmithPanel && !blacksmithPanel.classList.contains("hidden")) {
+                closeBlacksmithWindow(); // Demirci'nin özel kapatma fonksiyonu var
+                return;
+            }
+            if (shopPanel && !shopPanel.classList.contains("hidden")) {
+                shopPanel.classList.add("hidden");
+                return;
+            }
+            if (inventoryPanel && !inventoryPanel.classList.contains("hidden")) {
+                inventoryPanel.classList.add("hidden");
+                return;
+            }
+            if (characterPanel && !characterPanel.classList.contains("hidden")) {
+                characterPanel.classList.add("hidden");
+                return;
+            }
+            if (skillPanel && !skillPanel.classList.contains("hidden")) {
+                skillPanel.classList.add("hidden");
+                return;
+            }
+            
+            return; // ESC başka bir işlev yapmasın
+        }
+        // =================================================================
+
+
+        // Enter'a basıldığında ve chat kutusu odaklı DEĞİLSE (Sohbete odaklan)
+        if (key === 'enter' && document.activeElement !== chatInput) {
+            e.preventDefault(); 
+            chatInput.focus(); 
+            return; 
+        }
+        
+        // Eğer odak chatInput'taysa, hiçbir oyun tuşunu çalıştırma
+        if (document.activeElement === chatInput) {
+            return;
+        }
+        
+        // --- Buradan sonrası oyun mekanikleri (Hareket, Beceri vb.) ---
+        
+        if (!me || !me.isAlive) { e.preventDefault(); return; }
         if (e.target.tagName === 'INPUT') return;
         
-        const key = e.key.toLowerCase();
-        
+        // Hareket tuşları
         if (keysPressed[key] !== undefined && !keysPressed[key]) {
             keysPressed[key] = true;
             socket.emit("keyStateChange", { key, pressed: true });
             e.preventDefault();
         }
+        // Saldırı tuşu
         if (key === ' ') {
             socket.emit("attack");
             e.preventDefault();
         }
+       // Panel tuşları
        if (key === 'i') {
-            document.getElementById("inventoryPanel").classList.toggle("hidden");
+            if (inventoryPanel) inventoryPanel.classList.toggle("hidden");
             e.preventDefault();
         }
         if (key === 'k') {
             toggleSkillPanel();
             e.preventDefault();
         }
-
         if (key === 'c') {
             toggleCharacterPanel();
             e.preventDefault();
         }
-
+        // Aksiyon çubuğu tuşları
         if (ACTION_SLOT_KEYS.includes(key)) { 
             handleSkillUse(key);
             e.preventDefault();
         }
     });
 
+    // =================================================================
+    // ### YENİ EKLENEN 'keyup' DİNLEYİCİSİ (Yürüme Hatası Düzeltmesi) ###
+    // =================================================================
     window.addEventListener("keyup", (e) => {
-        if (e.target.tagName === 'INPUT') return;
-        
         const key = e.key.toLowerCase();
+        
+        // 1. Önce, bırakılan tuşun bir hareket tuşu olup olmadığını kontrol et.
         if (keysPressed[key] !== undefined) {
+            
+            // Eğer bir hareket tuşuysa ('w', 'a', 's', 'd'),
+            // odak nerede olursa olsun (sohbette bile olsak)
+            // 'pressed' durumunu 'false' yap ve sunucuya bildir.
+            // Bu, karakterin takılı kalmasını engeller.
+            
             keysPressed[key] = false;
             socket.emit("keyStateChange", { key, pressed: false });
         }
-    });
 
+        // 2. Artık 'INPUT' kontrolünü yapabiliriz.
+        // Eğer odak bir 'INPUT' içindeyse, (hareket tuşları dışındaki)
+        // başka bir 'keyup' eylemini engelle.
+        if (e.target.tagName === 'INPUT') {
+            return;
+        }
+    });
+    // =================================================================
+    // ### YENİ 'keyup' DİNLEYİİSİ SONU ###
+    // =================================================================
+
+    // Diğer dinleyicileri ayarla
+    setupBlacksmithListeners(); // Demirci panelini ayarla
+    setupChatListener(); // Sohbet girişini (Enter) ayarla
+
+    // Panel kapatma butonları
     const skillPanelCloseBtn = document.getElementById("skillPanelCloseBtn");
     if(skillPanelCloseBtn) {
         skillPanelCloseBtn.onclick = toggleSkillPanel;
@@ -1615,6 +2139,7 @@ function setupInputListeners() {
         };
     }
 
+    // Mağaza (Shop) Tab'ları
     document.querySelectorAll(".shop-tabs .tab-btn").forEach(btn => {
         btn.onclick = () => {
             document.querySelectorAll(".shop-tabs .tab-btn").forEach(b => b.classList.remove("active"));
@@ -1685,16 +2210,20 @@ function updateAnimations() {
             tickSpeed = 30;
         }
 
+        // --- HATA BURADAYDI - DÜZELTİLDİ ---
+        // 'currentStateKey' kullanan 'if' bloğu kaldırıldı
+        // ve sadece normal animasyon döngüsü bırakıldı.
         ad.animTicker++;
         if (ad.animTicker >= tickSpeed) {
             ad.animTicker = 0;
             const currentFrames = stateAsset ? stateAsset.frames : classAsset.idle.frames;
             ad.animFrame = (ad.animFrame + 1) % currentFrames;
         }
+        // --- DÜZELTME SONU ---
     }
 
 
-    // 2. MOB ANİMASYONLARI (HATA KONTROLÜ DÜZELTİLDİ)
+    // 2. MOB ANİMASYONLARI (Bu bölüm doğruydu, aynı kalır)
     for (const id in mobs) {
         const p = mobs[id];
         if (!p.asset) continue; 
@@ -1760,13 +2289,20 @@ function updateAnimations() {
             ad.prevAnimState = currentStateKey;
         }
         
-        ad.animTicker++;
-        if (ad.animTicker >= tickSpeed) {
-            ad.animTicker = 0;
-            ad.animFrame = (ad.animFrame + 1) % frames;
-            
-            if (currentStateKey === "hurt" && ad.animFrame === frames - 1) {
-                 ad.hurtPlayed = true;
+        if (currentStateKey === "hurt" && ad.hurtPlayed) {
+            // Animasyonu son karede (frames - 1) dondur
+            ad.animFrame = frames - 1; 
+        } else {
+            // Normal animasyon döngüsü
+            ad.animTicker++;
+            if (ad.animTicker >= tickSpeed) {
+                ad.animTicker = 0;
+                ad.animFrame = (ad.animFrame + 1) % frames;
+                
+                // Animasyon son kareye ulaştıysa 'hurtPlayed' olarak işaretle
+                if (currentStateKey === "hurt" && ad.animFrame === frames - 1) {
+                    ad.hurtPlayed = true;
+                }
             }
         }
         
@@ -1903,22 +2439,36 @@ function draw() {
     // MOBLAR
     for (const id in mobs) {
         const mob = mobs[id];
-        if (!mob.isAlive) continue; 
         if (mob.map !== me.map) continue;
         
         const mobId = `mob_${id}`;
         const mobAnimData = animData[mobId]; 
         
         const mobAsset = mob.asset ? assetDefinitions[mob.asset] : null;
+        // YENİ: Ölüm animasyonu ve 2 saniye bekleme
+        let isFadingOut = false;
+        if (!mob.isAlive) {
+            const now = Date.now();
+            // Sunucudan gelen deathTime'ı kullan
+            const deathTime = mob.deathTime || (now - MOB_RESPAWN_TIME); // (Eğer deathTime henüz gelmediyse 10sn geçmiş varsay)
+            const timeSinceDeath = now - deathTime;
+
+            if (timeSinceDeath > 2000) {
+                // 2 saniye geçti, artık çizmeyi bırak
+                continue;
+            }
+            
+            isFadingOut = true;
+            // 2 saniye boyunca yavaşça sol (fade-out)
+            ctx.globalAlpha = 1.0 - (timeSinceDeath / 2000);
+        }
+        // --- YENİ KOD SONU ---
 
         if (mobAsset) {
             
             const currentStateKey = mob.animState || "idle";
             
-            if (!mob.isAlive && mobAnimData && mobAnimData.hurtPlayed) {
-                delete animData[mobId];
-                continue; 
-            }
+            
             
             if (!mobAnimData) continue; 
             
@@ -1981,7 +2531,12 @@ function draw() {
             ctx.fillText(`${mob.type} Lv.${mob.level}`, mob.x + mob.width / 2, mob.y - 5);
 
 
-        } 
+        }
+        
+        // YENİ: Eğer bu mob için saydamlık kullandıysak, bir sonrakine geçmeden sıfırla
+        if (isFadingOut) {
+            ctx.globalAlpha = 1.0;
+        }
     }
     
     // NPC'ler
@@ -2270,35 +2825,47 @@ socket.on("gameState", (data) => {
   mobs = data.mobs;
   npcs = data.npcs;
   portals = data.portals || []; 
-});
 
-socket.on("itemDrop", ({ item }) => {
-    const index = inventory.findIndex(slot => slot === null);
-    if (index > -1) {
-        if (item.type === 'consumable' && item.quantity) {
-            const existingStackIndex = inventory.findIndex(i => i && i.id === item.id && i.quantity < 200);
-            
-            if (existingStackIndex !== -1) {
-                 inventory[existingStackIndex].quantity += item.quantity;
-            } else {
-                 inventory[index] = item;
-            }
-        } else {
-            inventory[index] = item;
-        }
-        
-        updateInventoryUI();
-        console.log(`${item.name} envantere eklendi!`);
-    } else {
-        console.log("Envanter dolu!");
-        showWarnPanel("Envanteriniz dolu, eşya yere düştü (ve kayboldu!)");
+  // --- BU BLOK KOMPLE GÜNCELLENDİ (TİTREME ÇÖZÜMÜ) ---
+  const me = players[mySocketId];
+  if (me) {
+    
+    // 1. Sunucudan gelen yeni veriyi al
+    const newInventory = me.inventory || Array(25).fill(null);
+    const newEquipment = me.equipment || { 
+        weapon: null, helmet: null, armor: null, shield: null,
+        necklace: null, earring: null, bracelet: null, shoes: null
+    };
+
+    // 2. Veriyi karşılaştırma için metne dönüştür
+    const newInventoryState = JSON.stringify(newInventory);
+    const newEquipmentState = JSON.stringify(newEquipment);
+    
+    let needsUpdate = false; // Güncelleme gerekiyor mu?
+
+    // 3. Envanter değişmiş mi diye kontrol et
+    if (newInventoryState !== lastInventoryState) {
+        inventory = newInventory; // Yerel envanteri güncelle
+        lastInventoryState = newInventoryState; // Son durumu kaydet
+        needsUpdate = true;
     }
+
+    // 4. Ekipman değişmiş mi diye kontrol et
+    if (newEquipmentState !== lastEquipmentState) {
+        equipment = newEquipment; // Yerel ekipmanı güncelle
+        lastEquipmentState = newEquipmentState; // Son durumu kaydet
+        needsUpdate = true;
+    }
+
+    // 5. EĞER İKİSİNDEN BİRİ DEĞİŞTİYSE, UI'ı SADECE BİR KEZ güncelle
+    if (needsUpdate) {
+        updateInventoryUI();
+    }
+  }
+  // --- GÜNCELLEME SONU ---
 });
 
-socket.on("equipmentUpdated", ({ equipment: serverEquipment }) => {
-    equipment = serverEquipment;
-    updateInventoryUI();
-});
+
 
 socket.on("itemToInventory", (item) => {
     const index = inventory.findIndex(slot => slot === null);
@@ -2373,6 +2940,58 @@ socket.on("consumableUsed", (data) => {
     }
 });
 
+socket.on("upgradeResult", (data) => {
+    
+    // Butonu tekrar kullanılabilir yap (Eğer +9 olmazsa updateBlacksmithUI tekrar ayarlar)
+    upgradeButton.disabled = false;
+    upgradeButton.textContent = "YÜKSELT";
+
+    if (data.success) {
+        // === BAŞARILI ===
+        showNotification({ title: "Demirci", message: data.message });
+        
+        // 1. Client envanterini sunucudan gelen yeni item ile güncelle
+        inventory[data.inventoryIndex] = data.item;
+        
+        // =================================================================
+        // ### KRİTİK DÜZELTME: resetUpgradeSlot() SİLİNDİ ###
+        // Demirci UI'ını temizlemek yerine, 
+        // bir sonraki yükseltmeyi göstermesi için YENİ item (data.item) ile güncelle.
+        updateBlacksmithUI(data.item, data.inventoryIndex);
+        // =================================================================
+
+        // 3. Envanter UI'ını güncelle
+        updateInventoryUI();
+        lastInventoryState = "[]"; // UI'ın güncellenmesini zorla
+    
+    } else {
+        // === BAŞARISIZ ===
+        if (data.isDestroyed) {
+             // Item yok oldu
+             showWarnPanel(data.message);
+             
+             // Client envanterinden sil
+             inventory[data.inventoryIndex] = null;
+             
+             // Demirci UI'ını temizle (Başarısız olunca temizlenmesi doğru)
+             resetUpgradeSlot();
+             
+             // Envanter UI'ını güncelle
+             updateInventoryUI();
+             lastInventoryState = "[]"; // Güncellenmeyi zorla
+
+        } else {
+             // Yetersiz yang, +9 vb.
+             showWarnPanel(data.message);
+             
+             // Butonu tekrar aktifleştir (eğer item hala oradaysa)
+             if(itemInUpgradeSlot) {
+                 upgradeButton.disabled = false;
+             }
+        }
+    }
+});
+
 socket.on("potUsedCooldown", (data) => {
     const duration = data.cooldown;
     globalPotCooldownEnd = Date.now() + duration;
@@ -2380,6 +2999,13 @@ socket.on("potUsedCooldown", (data) => {
     if (cooldownAnimationId === null) {
         cooldownAnimationId = requestAnimationFrame(updateCooldownVisuals);
     }
+});
+
+socket.on("newChatMessage", (data) => {
+    // data = { type: 'general', sender: 'OyuncuAdi', message: 'Merhaba' }
+    // veya { type: 'system', message: 'Sunucu yeniden başlıyor' }
+    
+    addMessageToChat(data);
 });
 
 socket.on("showNotification", (data) => {
@@ -2412,3 +3038,4 @@ socket.on("skillUsed", (data) => {
 socket.on("skillError", (data) => {
     showWarnPanel(data.message);
 });
+

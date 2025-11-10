@@ -219,6 +219,19 @@ const ITEM_DB = {
   5203: { id: 5203, name: "Şimşek Miğferi", type: "helmet", icon: "Helmet", def: 36, forClass: "lycan", requiredLevel: 41, iconSrc: "lycan_helmet_3.png", sellPrice: 3800 },
 };
 
+const UPGRADE_DATA = {
+    // [current_plus_level]: { cost: <yang>, successRate: <0-1>, weaponDmg: <bonus>, armorDef: <bonus> }
+    // Not: successRate = 1.0 (%100), 0.2 (%20)
+    0: { cost: 5000,    successRate: 1.00, weaponDmg: 3, armorDef: 2 }, // +0 -> +1
+    1: { cost: 10000,   successRate: 0.90, weaponDmg: 3, armorDef: 2 }, // +1 -> +2
+    2: { cost: 25000,   successRate: 0.80, weaponDmg: 3, armorDef: 2 }, // +2 -> +3
+    3: { cost: 50000,   successRate: 0.70, weaponDmg: 4, armorDef: 3 }, // +3 -> +4
+    4: { cost: 100000,  successRate: 0.60, weaponDmg: 4, armorDef: 3 }, // +4 -> +5
+    5: { cost: 250000,  successRate: 0.50, weaponDmg: 4, armorDef: 3 }, // +5 -> +6
+    6: { cost: 500000,  successRate: 0.40, weaponDmg: 5, armorDef: 5 }, // +6 -> +7
+    7: { cost: 1000000, successRate: 0.30, weaponDmg: 5, armorDef: 5 }, // +7 -> +8
+    8: { cost: 2500000, successRate: 0.20, weaponDmg: 6, armorDef: 6 }  // +8 -> +9
+};
 
 // ---------------------- NPC MAĞAZA VERİTABANI ----------------------
 const SHOP_DB = {
@@ -259,6 +272,108 @@ const MOB_TYPES = [
     // GÖRSEL TANIMLAR
     asset: "wolf", 
     idleSpeed: 25 
+  },
+
+  // --- KÖY CANAVARLARI (Village) ---
+  { type: "Pig", color: "#E6A4B4", baseHp: 30, dmg: 3, size: 25, levelRange: [1, 3], exp: 10, dropRate: 0.2, 
+    drops: [9001, 9011], // Sadece pot
+    isAggressive: false, moveSpeed: 4, aggroRange: 150, attackRange: 30, attackSpeed: 1200,
+    asset: "pig", 
+    idleSpeed: 30 
+  },
+  { type: "Boar", color: "#773e00", baseHp: 50, dmg: 6, size: 35, levelRange: [2, 4], exp: 12, dropRate: 0.2, 
+    drops: [1001, 2001, 3001, 4001, 5001], // Sadece Lv 1 silahlar
+    isAggressive: false, moveSpeed: 4.2, aggroRange: 180, attackRange: 40, attackSpeed: 1100,
+    asset: "boar", 
+    idleSpeed: 28 
+  },
+  { type: "Alpha Wolf", color: "#999", baseHp: 70, dmg: 8, size: 35, levelRange: [5, 8], exp: 20, dropRate: 0.3, 
+    drops: [1002, 2002, 3002, 4002, 101, 102, 103, 104, 105], // Lv 5 silahlar ve aksesuarlar
+    isAggressive: true, moveSpeed: 4.8, aggroRange: 220, attackRange: 40, attackSpeed: 900,
+    asset: "alphaWolf", 
+    idleSpeed: 20 
+  },
+  { type: "Dire Wolf", color: "#555", baseHp: 100, dmg: 11, size: 40, levelRange: [8, 12], exp: 30, dropRate: 0.4, 
+    drops: [1003, 2003, 3003, 4003, 5002, 1102, 2102, 3102, 4102], // Lv 10 silah, Lv 9 zırh
+    isAggressive: true, moveSpeed: 4.6, aggroRange: 230, attackRange: 45, attackSpeed: 1000,
+    asset: "direWolf", 
+    idleSpeed: 22 
+  },
+  { type: "Shadow Wolf", color: "#222", baseHp: 120, dmg: 14, size: 35, levelRange: [12, 16], exp: 50, dropRate: 0.5, 
+    drops: [1004, 2004, 3004, 4004], // Lv 15 silahlar
+    isAggressive: true, moveSpeed: 5.0, aggroRange: 250, attackRange: 40, attackSpeed: 800,
+    asset: "shadowWolf", 
+    idleSpeed: 18 
+  },
+  { type: "Rabid Wolf", color: "#b30000", baseHp: 140, dmg: 18, size: 40, levelRange: [15, 18], exp: 65, dropRate: 0.5, 
+    drops: [1004, 2004, 3004, 4004], // Lv 15 silahlar
+    isAggressive: true, moveSpeed: 5.2, aggroRange: 280, attackRange: 40, attackSpeed: 700,
+    asset: "rabidWolf", 
+    idleSpeed: 15 
+  },
+  { type: "Ancient Wolf", color: "#DDD", baseHp: 160, dmg: 22, size: 45, levelRange: [18, 20], exp: 80, dropRate: 0.6, 
+    drops: [1103, 2103, 3103, 4103, 1005, 2005, 3005, 4005, 5003], // Lv 18 zırh, Lv 20 silah
+    isAggressive: true, moveSpeed: 4.5, aggroRange: 250, attackRange: 50, attackSpeed: 1000,
+    asset: "ancientWolf", 
+    idleSpeed: 20 
+  },
+
+  // --- ORMAN CANAVARLARI (Forest) ---
+  { type: "Forest Spider", color: "#006400", baseHp: 180, dmg: 24, size: 40, levelRange: [21, 25], exp: 100, dropRate: 0.7, 
+    drops: [1202, 2202, 3202, 4202, 5202], // Lv 21 kasklar
+    isAggressive: false, moveSpeed: 4.5, aggroRange: 200, attackRange: 50, attackSpeed: 900,
+    asset: "spider", 
+    idleSpeed: 20 
+  },
+  { type: "Giant Spider", color: "#383838", baseHp: 220, dmg: 28, size: 60, levelRange: [26, 30], exp: 130, dropRate: 0.7, 
+    drops: [1104, 2104, 3104, 4104, 5104, 1006, 2006, 3006, 4006], // Lv 26 zırh, Lv 25 silah
+    isAggressive: true, moveSpeed: 4.2, aggroRange: 250, attackRange: 70, attackSpeed: 1300,
+    asset: "giantSpider", 
+    idleSpeed: 25 
+  },
+  { type: "Venom Spider", color: "#800080", baseHp: 280, dmg: 32, size: 45, levelRange: [31, 35], exp: 180, dropRate: 0.8, 
+    drops: [1007, 2007, 3007, 4007, 5004], // Lv 30 silahlar
+    isAggressive: true, moveSpeed: 4.8, aggroRange: 280, attackRange: 50, attackSpeed: 800,
+    asset: "spider", 
+    idleSpeed: 18 
+  },
+  { type: "Tarantula", color: "#8B4513", baseHp: 350, dmg: 40, size: 65, levelRange: [36, 40], exp: 220, dropRate: 0.8, 
+    drops: [1105, 2105, 3105, 4105, 5105, 1008, 2008, 3008, 4008], // Lv 34 zırh, Lv 36 silah
+    isAggressive: true, moveSpeed: 4.3, aggroRange: 260, attackRange: 75, attackSpeed: 1200,
+    asset: "giantSpider", 
+    idleSpeed: 24 
+  },
+
+  // --- ÇÖL CANAVARLARI (Desert) ---
+  { type: "Sand Spider", color: "#F0E68C", baseHp: 400, dmg: 45, size: 40, levelRange: [41, 45], exp: 300, dropRate: 0.7, 
+    drops: [1009, 2009, 3009, 4009, 5005], // Lv 40 silahlar
+    isAggressive: false, moveSpeed: 4.7, aggroRange: 200, attackRange: 50, attackSpeed: 900,
+    asset: "spider", 
+    idleSpeed: 20 
+  },
+  { type: "Scorpion Spider", color: "#DAA520", baseHp: 480, dmg: 55, size: 50, levelRange: [46, 50], exp: 380, dropRate: 0.7, 
+    drops: [1203, 2203, 3203, 4203, 5203], // Lv 41 kasklar
+    isAggressive: true, moveSpeed: 5.0, aggroRange: 300, attackRange: 55, attackSpeed: 800,
+    asset: "spider", 
+    idleSpeed: 18 
+  },
+  { type: "Dune Lurker", color: "#C2B280", baseHp: 550, dmg: 60, size: 45, levelRange: [51, 55], exp: 450, dropRate: 0.6, 
+    drops: [1106, 2106, 3106, 4106, 5106], // Lv 42 zırhlar
+    isAggressive: true, moveSpeed: 5.2, aggroRange: 320, attackRange: 50, attackSpeed: 700,
+    asset: "spider", 
+    idleSpeed: 16 
+  },
+  { type: "Redback Spider", color: "#FF0000", baseHp: 620, dmg: 70, size: 50, levelRange: [56, 60], exp: 520, dropRate: 0.6, 
+    drops: [1010, 2010, 3010, 4010, 5006], // Lv 45 silahlar
+    isAggressive: true, moveSpeed: 5.0, aggroRange: 300, attackRange: 55, attackSpeed: 800,
+    asset: "spider", 
+    idleSpeed: 18 
+  },
+  { type: "Spider Queen", color: "#4B0082", baseHp: 800, dmg: 80, size: 70, levelRange: [58, 60], exp: 700, dropRate: 0.9, 
+    drops: [1010, 2010, 3010, 4010, 5006], // Lv 45 silahlar
+    isAggressive: true, moveSpeed: 4.5, aggroRange: 350, attackRange: 80, attackSpeed: 1100,
+    asset: "giantSpider", 
+    idleSpeed: 22 
   },
     
   // levelRange: [3, 10]
@@ -486,49 +601,54 @@ const MAP_DATA = {
   village: {
     width: 6440,
     height: 4480,
+    safeZone: { x: 3200, y: 3000, radius: 600 }, // YENİ: Güvenli bölge tanımı
     portals: [
       { x: 3120, y: 0, width: 200, height: 40, targetMap: "forest", targetX: 3080, targetY: 4300 },
     ],
-    allowedLevelRange: [1, 20], // Köyde max 20 Lv mob doğabilir.
-    // YENİ EKLENDİ: Kademeli Zorluk için Bölge Tanımları
+    allowedLevelRange: [1, 20], 
     zones: [
-      { maxRadius: 1000, levelMin: 1, levelMax: 10 }, // Güvenli bölge dışı, Lv 1-10 (Wolf, Snake)
-      { maxRadius: 3500, levelMin: 6, levelMax: 15 }, // Orta bölge, Lv 6-15 (Orc)
-      { maxRadius: 4500, levelMin: 11, levelMax: 20 }, // Dış bölge, Lv 11-20 (Demonlar da burada doğabilir)
+      { maxRadius: 1000, levelMin: 1, levelMax: 10 }, 
+      { maxRadius: 3500, levelMin: 6, levelMax: 15 }, 
+      { maxRadius: 4500, levelMin: 11, levelMax: 20 }, 
     ],
   },
   forest: {
     width: 6160,
     height: 4480,
+    safeZone: { x: 3080, y: 4300, radius: 400 }, // YENİ: Orman giriş güvenli bölge
     portals: [
-      // Köye dönüş portalı
       { x: 2980, y: 4440, width: 200, height: 40, targetMap: "village", targetX: 3220, targetY: 100 },
-      // YENİ: Çöle gidiş portalı (Ormanın kuzeyinde)
       { x: 3000, y: 0, width: 200, height: 40, targetMap: "desert", targetX: 3000, targetY: 4300 },
     ],
-    allowedLevelRange: [21, 40], // YENİ SEVİYE ARALIĞI (Çakışmayı önlemek için)
+    allowedLevelRange: [21, 40],
+    zones: [ // YENİ: Orman için seviye bölgesi
+        { maxRadius: 5000, levelMin: 21, levelMax: 40 } 
+    ]
   },
-  // YENİ: Çöl Haritası
   desert: {
     width: 6160,
     height: 4480,
+    safeZone: { x: 3000, y: 4300, radius: 400 }, // YENİ: Çöl giriş güvenli bölge
     portals: [
-      // Ormana dönüş portalı (Çölün güneyinde)
       { x: 3000, y: 4440, width: 200, height: 40, targetMap: "forest", targetX: 3000, targetY: 100 },
-      // YENİ: Buzul haritasına gidiş (Çölün kuzeyinde)
       { x: 3000, y: 0, width: 200, height: 40, targetMap: "ice", targetX: 500, targetY: 4300 },
     ],
-    allowedLevelRange: [41, 60], // (Bu aynı kalabilir)
+    allowedLevelRange: [41, 60],
+    zones: [ // YENİ: Çöl için seviye bölgesi
+        { maxRadius: 5000, levelMin: 41, levelMax: 60 }
+    ]
   },
-  // YENİ: Buzul Haritası
   ice: {
     width: 6160,
     height: 4480,
+    safeZone: { x: 500, y: 4300, radius: 400 }, // YENİ: Buzul giriş güvenli bölge
     portals: [
-      // Çöle dönüş portalı (Buzulun güneyinde)
       { x: 500, y: 4440, width: 200, height: 40, targetMap: "desert", targetX: 3000, targetY: 100 },
     ],
-    allowedLevelRange: [61, 80], // (Bu aynı kalabilir)
+    allowedLevelRange: [61, 80],
+    zones: [ // YENİ: Buzul için seviye bölgesi
+        { maxRadius: 5000, levelMin: 61, levelMax: 80 }
+    ]
   },
 };
 
@@ -546,6 +666,7 @@ const ATTACK_RANGE = 80;
 const ATTACK_COOLDOWN = 500;
 const MAX_SKILL_LEVEL = 20; // YENİ EKLENEN SABİT
 const MAX_CHARACTERS_PER_ACCOUNT = 2; // YENİ: Hesap başına maksimum karakter sayısı
+const MOB_RESPAWN_TIME = 10000; // YENİ EKLENDİ: 10000ms = 10 Saniye
 
 // ---------------------- NPC TANIMLARI ----------------------
 const NPC_DEFINITIONS = [
@@ -677,14 +798,14 @@ function savePlayer(player) {
     const { 
         id, name, kingdom, class: charClass, map, x, y, direction,
         level, exp, maxExp, hp, maxHp, mp, maxMp, yang, 
-        stats, statPoints, equipment, skillSet, skills, skillPoints 
+        stats, statPoints, inventory, equipment, skillSet, skills, skillPoints 
         // keysPressed, animState, lastAttack, bonusDmg gibi türetilmişler/anlık durumlar hariç
     } = player;
     
     const saveObject = { 
         id, name, kingdom, class: charClass, map, x, y, direction,
         level, exp, maxExp, hp: player.hp, maxHp, mp: player.mp, maxMp, yang,
-        stats, statPoints, equipment, skillSet, skills, skillPoints 
+        stats, statPoints, inventory, equipment, skillSet, skills, skillPoints 
     };
 
     // 2. Dosya yolunu belirle
@@ -740,6 +861,7 @@ function createPlayer(socket, data) {
             isAlive: true,
             
             // Yeni eklenen/mevcut olmayan alanları ekle (güvenlik için)
+            inventory: existingData.inventory || Array(25).fill(null),
             skillSet: existingData.skillSet === undefined ? null : existingData.skillSet,
             skills: existingData.skills || {},
             activeBuffs: {},
@@ -783,6 +905,7 @@ function createPlayer(socket, data) {
                 weapon: null, helmet: null, armor: null, shield: null,
                 necklace: null, earring: null, bracelet: null, shoes: null
             },
+            inventory: Array(25).fill(null),
 
             skillSet: null,
             skillPoints: 0, 
@@ -800,15 +923,18 @@ function createPlayer(socket, data) {
     return player;
 }
 
-// server.js (spawnMob fonksiyonunun TAMAMI)
-function spawnMob() {
-  const mapName = "village";
+function spawnMob(mapName) { // YENİ: mapName argümanı eklendi
+  // const mapName = "village"; // ESKİ: Bu satırı sil
   const map = MAP_DATA[mapName];
   if (!map) return;
 
-  const mapLevelRange = map.allowedLevelRange || [1, 20]; 
-  const mapCenter = { x: 3200, y: 3000 }; 
-  const safeZoneRadius = 600; 
+  const mapLevelRange = map.allowedLevelRange || [1, 99]; // Güncellendi
+  
+  // YENİ: Güvenli bölge ayarları MAP_DATA'dan okundu
+  const safeZone = map.safeZone || { x: map.width / 2, y: map.height / 2, radius: 0 };
+  const mapCenter = { x: safeZone.x, y: safeZone.y }; 
+  const safeZoneRadius = safeZone.radius; 
+  
   let spawnX, spawnY, distanceToCenter;
   let attempts = 0;
   const maxAttempts = 100;
@@ -834,31 +960,37 @@ function spawnMob() {
 
   if (map.zones) {
       // Bulunduğu mesafeye (distanceToCenter) göre hangi bölgeye ait olduğunu bul
-      const currentZone = map.zones.find(zone => distanceToCenter <= zone.maxRadius);
+      // YENİ: Uzaklığa göre en uygun bölgeyi bul (Köy dışındaki haritalar için)
+      let currentZone = null;
+      if (map.zones.length === 1) {
+          currentZone = map.zones[0];
+      } else {
+          // Köy gibi çoklu zone varsa en yakınını bul
+          currentZone = map.zones.find(zone => distanceToCenter <= zone.maxRadius);
+      }
       
       if (currentZone) {
           targetLevelMin = currentZone.levelMin;
           targetLevelMax = currentZone.levelMax;
       }
-      // NOT: Eğer zone bulunamazsa, haritanın genel aralığı kullanılır (1-20)
   }
 
   // 3. Bölge Seviye Aralığına Uyan Mobları Filtrele
-  // Moblar artık sadece (targetLevelMin - targetLevelMax) aralığına uygun olanlardan seçilecek.
+  // (Bu bölüm aynı kalıyor, zaten doğru çalışıyor)
   const validMobs = MOB_TYPES.filter(m => {
-    // Mobun seviye aralığı hedef seviye aralığıyla çakışmalı
     return m.levelRange[1] >= targetLevelMin && m.levelRange[0] <= targetLevelMax;
   });
   
   if (validMobs.length === 0) {
-    // console.log(`[HATA] ${targetLevelMin}-${targetLevelMax} aralığında geçerli mob bulunamadı.`);
     return;
   }
   
-  // 4. Mob tipini rastgele seç (Artık sadece uygun moblar validMobs içinde)
+  // 4. Mob tipini rastgele seç
+  // (Bu bölüm aynı kalıyor)
   const mobType = validMobs[Math.floor(Math.random() * validMobs.length)];
   
   // 5. Mob seviyesini aralık içinde rastgele belirle
+  // (Bu bölüm aynı kalıyor)
   const levelMin = Math.max(mobType.levelRange[0], targetLevelMin);
   const levelMax = Math.min(mobType.levelRange[1], targetLevelMax);
   
@@ -866,11 +998,11 @@ function spawnMob() {
   
   const level = levelMin + Math.floor(Math.random() * (levelMax - levelMin + 1));
   
-  // 6. Mob objesini oluştur (Aynı kalır)
+  // 6. Mob objesini oluştur (map: mapName kullandığından emin ol)
   const mob = {
     id: ++lastMobId,
     type: mobType.type,
-    map: mapName,
+    map: mapName, // Burası zaten doğru (mapName değişkenini kullanıyor)
     x: spawnX, 
     y: spawnY, 
     spawnX: spawnX, 
@@ -980,8 +1112,10 @@ function handlePlayerDeath(player) {
 }
 
 function spawnInitialMobs() {
-  while (Object.keys(mobs).length < 40) {
-    spawnMob();
+  let count = 0;
+  while (count < 40) {
+    spawnMob("village"); // YENİ: Hangi haritada spawn olacağını belirt
+    count++;
   }
 }
 
@@ -1026,6 +1160,8 @@ io.on("connection", (socket) => {
         // CANAVAR ÖLDÜ
         if (mob.hp <= 0) {
           mob.isAlive = false;
+          mob.deathTime = Date.now(); // <-- YENİ EKLENEN SATIR
+
           giveExp(player, mob.exp);
           
           // --- YANG DÜŞÜRME BÖLÜMÜ ---
@@ -1041,17 +1177,53 @@ io.on("connection", (socket) => {
           
           if (Math.random() < mob.dropRate) {
             const itemId = mob.drops[Math.floor(Math.random() * mob.drops.length)];
-            const item = { ...ITEM_DB[itemId] };
+            const itemTemplate = ITEM_DB[itemId];
+            if (!itemTemplate) continue; // Güvenlik kontrolü
+            
+            const item = { ...itemTemplate }; // Eşyanın kopyasını oluştur
             console.log(`${player.name} ${mob.type}'dan ${item.name} düşürdü!`);
             
-            // --- YENİ EKLENDİ: EŞYA DÜŞME BİLDİRİMİ ---
-            socket.emit("showNotification", {
-                title: "Eşya Düştü!",
-                message: `${mob.type} canavarından **${item.name}** kazandın.`
-            });
-            // --- EŞYA DÜŞME BİLDİRİMİ SONU ---
+            // --- YENİ: EŞYAYI SUNUCUDA ENVANTERE EKLE ---
+            let itemAdded = false;
+
+            // 1. Tüketilebilir (Pot) ise birleştirmeyi (stack) dene
+            if (item.type === 'consumable') {
+                const existingStackIndex = player.inventory.findIndex(i => i && i.id === item.id && i.quantity < 200);
+                if (existingStackIndex !== -1) {
+                    player.inventory[existingStackIndex].quantity = (player.inventory[existingStackIndex].quantity || 1) + 1; // Miktarı 1 artır
+                    itemAdded = true;
+                }
+            }
             
-            socket.emit("itemDrop", { item });
+            // 2. Birleşmediyse (veya pot değilse), boş slot ara
+            if (!itemAdded) {
+                const index = player.inventory.findIndex(slot => slot === null);
+                if (index > -1) {
+                    // Potlar 1 adet olarak düşer
+                    if (item.type === 'consumable') {
+                        item.quantity = 1; 
+                    }
+                    player.inventory[index] = item;
+                    itemAdded = true;
+                }
+            }
+            // --- SUNUCU EKLEME SONU ---
+
+            // 3. Ekleme başarılı olduysa bildirim gönder
+            if (itemAdded) {
+                socket.emit("showNotification", {
+                    title: "Eşya Düştü!",
+                    message: `${mob.type} canavarından **${item.name}** kazandın.`
+                });
+            } else {
+                // Envanter dolu, client'a "dolu" bildirimi gönder
+                socket.emit("showNotification", {
+                    title: "Envanter Dolu!",
+                    message: `Envanteriniz dolu, ${item.name} yere düştü (ve kayboldu!)`
+                });
+            }
+            
+            // socket.emit("itemDrop", { item }); // <-- ESKİ KOD SİLİNDİ
           }
         }
       }
@@ -1396,29 +1568,75 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
           return;
       }
       
-      // Miktarı belirle: Yığın itemse (91XX ID'ler), miktar stackSize olur. Değilse 1'dir.
       const actualQuantity = itemData.stackSize || quantity; 
-      const totalCost = itemData.buyPrice * quantity; // Pot yığınlarında quantity hep 1 olmalı.
+      const totalCost = itemData.buyPrice * quantity; 
 
       if (player.yang < totalCost) {
           socket.emit("showNotification", { title: "Hata", message: "Yeterli Yang'ın yok." });
           return;
       }
 
-      // Başarılı alışveriş
-      player.yang -= totalCost;
+      // --- YENİ SATIN ALMA MANTIĞI ---
 
-      // Item objesini oluştur
-      const itemToDrop = { ...itemData };
-      itemToDrop.quantity = actualQuantity; // Yığın miktarı eklendi
-
-      // itemDrop eventini kullanarak itemi envantere ekleyelim
-      socket.emit("itemDrop", { item: itemToDrop });
+      // 1. Alınan yığın itemi, gerçek (base) iteme çevir
+      let baseItemId = itemData.id;
+      let finalQuantity = actualQuantity;
       
-      socket.emit("showNotification", { 
-          title: "Satın Alındı", 
-          message: `${itemData.name} x${actualQuantity} için ${totalCost.toLocaleString()} Yang harcadın.` 
-      });
+      if (itemData.id > 9100 && itemData.id < 9110) { // Kırmızı yığın
+          baseItemId = 9001; 
+      } else if (itemData.id > 9110) { // Mavi yığın
+          baseItemId = 9011;
+      }
+      
+      const finalItemTemplate = ITEM_DB[baseItemId];
+      if (!finalItemTemplate) return; // Güvenlik kontrolü
+
+      // 2. Sunucuda envantere eklemeyi dene
+      let itemAdded = false;
+      let quantityLeftToAdd = finalQuantity;
+
+      // 2a. Mevcut yığınları doldur
+      for (let i = 0; i < player.inventory.length; i++) {
+          if (quantityLeftToAdd <= 0) break;
+          const slot = player.inventory[i];
+          if (slot && slot.id === baseItemId && slot.quantity < 200) {
+              const spaceLeft = 200 - slot.quantity;
+              const amountToAdd = Math.min(quantityLeftToAdd, spaceLeft);
+              slot.quantity += amountToAdd;
+              quantityLeftToAdd -= amountToAdd;
+              itemAdded = true;
+          }
+      }
+
+      // 2b. Kalanı boş slotlara ekle
+      while (quantityLeftToAdd > 0) {
+          const index = player.inventory.findIndex(slot => slot === null);
+          if (index > -1) {
+              const amountToAdd = Math.min(quantityLeftToAdd, 200); // Bir slota max 200
+              player.inventory[index] = { ...finalItemTemplate, quantity: amountToAdd };
+              quantityLeftToAdd -= amountToAdd;
+              itemAdded = true; 
+          } else {
+              // Envanter doldu
+              socket.emit("showNotification", { title: "Hata", message: "Envanter dolu, eşyanın bir kısmı veya tamamı alınamadı." });
+              quantityLeftToAdd = 0; // Döngüyü kır
+          }
+      }
+
+      // 3. Ekleme başarılı olduysa Yang'ı düş ve bildir
+      if (itemAdded) {
+          player.yang -= totalCost; // Parayı SADECE item eklenebildiyse düş
+          
+          // socket.emit("itemDrop", { item: itemToDrop }); // <-- ESKİ KOD SİLİNDİ
+
+          socket.emit("showNotification", { 
+              title: "Satın Alındı", 
+              message: `${itemData.name} (x${actualQuantity}) için ${totalCost.toLocaleString()} Yang harcadın.` 
+          });
+      } else {
+          // Hiç yer yoksa (yukarıdaki 2b'de zaten hata gönderildi ama bu ek bir kontrol)
+           socket.emit("showNotification", { title: "Hata", message: "Envanter dolu, eşya alınamadı." });
+      }
   });
 
   // --- YENİ EKLENDİ: EŞYA SATMA EVENTİ ---
@@ -1463,7 +1681,6 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
     let success = false;
     
     // HP/MP Dolu Kontrolü
-    // ... (Aynı kalır, önceki güncellemedeki mantık) ...
     const hpFull = player.hp >= player.maxHp;
     const mpFull = player.mp >= player.maxMp;
     
@@ -1498,15 +1715,123 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
         // Client'a potun kullanıldığını ve cooldown süresini bildir
         socket.emit("potUsedCooldown", { cooldown: POT_COOLDOWN_MS });
         
-        // Envanterden düşme onayı (quantity azaltma client tarafında)
+        // =================================================================
+        // ### YENİ EKLENEN GÜNCELLEME ###
+        // Sunucu tarafında envanteri anında güncelle
+        // =================================================================
+        const itemInSlot = player.inventory[inventoryIndex];
+        if (itemInSlot && itemInSlot.id === itemId) { // İkili kontrol
+            if (itemInSlot.quantity > 1) {
+                itemInSlot.quantity--; // Miktarı azalt
+            } else {
+                player.inventory[inventoryIndex] = null; // Slotu boşalt
+            }
+        }
+        // =================================================================
+        
+        // Envanterden düşme onayı (client'ın action bar'ını temizlemesi için)
         socket.emit("consumableUsed", { inventoryIndex: inventoryIndex });
         
-        // ... (showNotification aynı kalır) ...
         socket.emit("showNotification", {
             title: "Pot Kullanıldı",
             message: `**${itemData.name}** kullanıldı. HP/MP yenilendi.`
         });
     }
+  });
+
+  // --- YENİ EKLENDİ (SOHBET) ---
+  socket.on("sendChatMessage", (data) => {
+      const player = players[socket.id];
+      if (!player) return; // Oyuncu yoksa (bir hata varsa)
+
+      const message = data.message.trim();
+      if (message.length === 0 || message.length > 100) { // Boş veya çok uzun mesajları engelle
+          return;
+      }
+
+      // Şu an için 'Genel Sohbet' yapıyoruz (Harita fark etmeksizin herkese gönder)
+      // TODO: Gelecekte /w (fısıltı) veya haritaya özel sohbet eklenebilir.
+      
+      console.log(`[Sohbet] ${player.name}: ${message}`);
+
+      // Tüm oyunculara (gönderen dahil) mesajı dağıt
+      io.emit("newChatMessage", {
+          type: 'general',
+          sender: player.name, // Gönderenin adını ekle
+          message: message     // Mesajı ekle
+      });
+  });
+
+  socket.on("attemptUpgrade", ({ inventoryIndex }) => {
+      const player = players[socket.id];
+      if (!player) return;
+
+      const item = player.inventory[inventoryIndex];
+      
+      // 1. Doğrulama: Eşya var mı?
+      if (!item) {
+          return socket.emit("upgradeResult", { success: false, message: "Eşya bulunamadı." });
+      }
+      
+      // 2. Doğrulama: Eşya tipi uygun mu?
+      const itemType = item.type;
+      if (itemType !== 'weapon' && itemType !== 'armor' && itemType !== 'helmet' && itemType !== 'shield') {
+          return socket.emit("upgradeResult", { success: false, message: "Sadece Silah, Zırh, Kask ve Kalkanlar yükseltilebilir." });
+      }
+
+      // 3. Doğrulama: Maksimum seviyede mi?
+      const currentPlus = item.plus || 0;
+      if (currentPlus >= 9) {
+          return socket.emit("upgradeResult", { success: false, message: "Bu eşya zaten +9." });
+      }
+
+      // 4. Doğrulama: Yeterli Yang var mı?
+      const upgradeInfo = UPGRADE_DATA[currentPlus];
+      if (player.yang < upgradeInfo.cost) {
+          return socket.emit("upgradeResult", { success: false, message: `Yeterli Yang yok. Gerekli: ${upgradeInfo.cost.toLocaleString()} Yang` });
+      }
+
+      // 5. Parayı Çek
+      player.yang -= upgradeInfo.cost;
+
+      // 6. Zarı At (Başarı Şansı Kontrolü)
+      if (Math.random() < upgradeInfo.successRate) {
+          
+          // === BAŞARILI ===
+          item.plus = currentPlus + 1;
+          
+          // Eşyanın adını güncelle (örn: "Kılıç" -> "Kılıç +1")
+          // split(' +')[0] sayesinde "Kılıç +8" -> "Kılıç" -> "Kılıç +9" olur.
+          item.name = `${item.name.split(' +')[0]} +${item.plus}`;
+
+          // İstatistikleri uygula
+          if (itemType === 'weapon') {
+              item.dmg = (item.dmg || 0) + upgradeInfo.weaponDmg;
+          } else { // armor, helmet, shield
+              item.def = (item.def || 0) + upgradeInfo.armorDef;
+          }
+          
+          // Client'a başarılı sonucu ve güncellenmiş eşyayı gönder
+          socket.emit("upgradeResult", {
+              success: true,
+              message: `Başarılı! Eşyan ${item.name} seviyesine yükseldi.`,
+              item: item, // Güncellenmiş eşya objesi
+              inventoryIndex: inventoryIndex
+          });
+
+      } else {
+          
+          // === BAŞARISIZ ===
+          player.inventory[inventoryIndex] = null; // Eşya yok oldu
+          
+          // Client'a başarısız sonucu gönder
+          socket.emit("upgradeResult", {
+              success: false,
+              isDestroyed: true,
+              message: `Başarısız... ${item.name.split(' +')[0]} yok oldu.`,
+              inventoryIndex: inventoryIndex
+          });
+      }
   });
 
   socket.on("registerAttempt", async ({ username, password }) => {
@@ -1699,10 +2024,30 @@ function serverGameLoop() {
     // ... (Hiçbir değişiklik yapmana gerek yok) ...
     const mob = mobs[mobId];
 
-    // 2a. Ölüm Kontrolü
+    // 2a. Ölüm/Respawn Kontrolü (GÜNCELLENDİ)
     if (!mob.isAlive) {
-      delete mobs[mobId];
-      continue; // Döngüde bir sonraki mob'a geç
+      // Mob ölü. Respawn zamanı geldi mi?
+      const now = Date.now(); // (Bu 'now' değişkeni zaten döngünün başında tanımlı olmalı)
+      
+      if (now - (mob.deathTime || now) >= MOB_RESPAWN_TIME) {
+        // Evet, respawn et!
+        mob.hp = mob.maxHp;
+        mob.isAlive = true;
+        mob.x = mob.spawnX; // Orijinal spawn X'ine geri dön
+        mob.y = mob.spawnY; // Orijinal spawn Y'sine geri dön
+        mob.targetId = null;
+        mob.deathTime = undefined; // Ölüm zamanını temizle
+      } else {
+        // Henüz zamanı gelmedi.
+        // 'continue' KULLANMA. Client'ın ölü olduğunu, animasyon
+        // oynatması gerektiğini ve deathTime'ı bilmesi için
+        // mob verisini göndermeye devam etmeliyiz.
+      }
+    }
+
+    // YENİ: Eğer mob hala ölü (respawn bekliyor), AI'ı çalıştırma
+    if (!mob.isAlive) {
+      continue;
     }
     
     // 2b. Animasyon (Eski mantığı koru)
@@ -1789,10 +2134,25 @@ function serverGameLoop() {
     }
   } // for(mobs) sonu
 
-  // 2f. Mob Sayısını Doldur
-  if (Object.keys(mobs).length < 200) {
-    spawnMob();
-  }
+  // 2f. Mob Sayısını Doldur (Harita Başına)
+  const mobCountByMap = {};
+    for (const mapName in MAP_DATA) {
+        mobCountByMap[mapName] = 0;
+    }
+    
+    for (const mobId in mobs) {
+        if (mobs[mobId].map && mobCountByMap[mobs[mobId].map] !== undefined) {
+            mobCountByMap[mobs[mobId].map]++;
+        }
+    }
+
+    const MAX_MOBS_PER_MAP = 100; // Harita başına maksimum mob sayısı (Toplam 200 mob)
+    
+    for (const mapName in mobCountByMap) {
+        if (mobCountByMap[mapName] < MAX_MOBS_PER_MAP) {
+            spawnMob(mapName); // YENİ: Eksik olan haritaya mob spawnla
+        }
+    }
 
   // 3. NPC Animasyon
   for (const npcId in npcs) {

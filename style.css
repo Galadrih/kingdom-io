@@ -772,7 +772,7 @@ button:active {
 }
 
 /* --- GENEL PANELLER (K, C, SHOP) --- */
-.skill-panel, .char-panel, .shop-panel {
+.skill-panel, .char-panel, .shop-panel, #blacksmithPanel {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1392,3 +1392,158 @@ button:active {
     border-top: 2px dashed #4a148c;
     margin-top: 20px;
 }
+
+/* style.css (dosyanın sonuna ekle) */
+#blacksmithPanel {
+    width: 350px;
+}
+
+#upgradeInterface {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    text-align: center;
+}
+
+#upgradeInterface p {
+    font-size: 13px;
+    color: #ccc;
+    margin-bottom: 15px;
+}
+
+#upgradeSlot {
+    width: 60px;
+    height: 60px;
+    border: 2px dashed #555;
+    background-color: rgba(0, 0, 0, 0.3);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#upgradeSlot.occupied {
+    border-style: solid;
+    border-color: #888;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+#upgradeSlot img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+#upgradeInfo {
+    font-size: 14px;
+    margin-bottom: 20px;
+    color: #eee;
+    width: 100%;
+    text-align: left;
+    padding-left: 20px;
+}
+
+#upgradeInfo div {
+    margin-bottom: 8px;
+}
+
+#upgradeButton {
+    width: 80%;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* style.css (dosyanın sonuna ekleyin) */
+
+.item-plus {
+    position: absolute;
+    bottom: 0px; /* Alttan 0 piksel */
+    right: 2px;  /* Sağdan 2 piksel */
+    background-color: rgba(0, 0, 0, 0.7); /* Hafif şeffaf arka plan */
+    color: #ffcc00; /* Altın rengi yazı */
+    font-size: 10px; /* Küçük font */
+    font-weight: bold;
+    padding: 1px 4px;
+    border-radius: 3px;
+    line-height: 1; /* Metnin dikey hizalamasını düzeltir */
+    pointer-events: none; /* Tooltipin arkasında kalmasını sağlar */
+    border: 1px solid rgba(255, 204, 0, 0.3); /* Hafif parlak kenar */
+}
+
+#chatContainer {
+    position: absolute;
+    bottom: 100px; /* Aksiyon çubuğunun üstü */
+    left: 20px;
+    width: 400px;
+    height: 200px;
+    background-color: rgba(0, 0, 0, 0.4);
+    border: 1px solid #444;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto; /* Tıklanabilirlik */
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+#chatMessages {
+    flex-grow: 1;
+    overflow-y: auto; /* Kaydırma çubuğu */
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Kaydırma çubuğu stili (opsiyonel) */
+#chatMessages::-webkit-scrollbar { width: 8px; }
+#chatMessages::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+#chatMessages::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+
+.chat-msg {
+    color: #f0e6d2; /* Kirli beyaz */
+    line-height: 1.4;
+    text-shadow: 1px 1px 1px #000;
+}
+.chat-msg.system { color: #FFD700; font-style: italic; } /* Sistem mesajları (sarı) */
+.chat-msg.error { color: #FF4444; font-weight: bold; } /* Hata mesajları (kırmızı) */
+/* (Gelecekte eklenecek: .whisper, .party, .guild) */
+
+#chatInput {
+    border: none;
+    border-top: 1px solid #444;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    padding: 10px;
+    outline: none;
+}
+
+#chatInput:focus {
+    background-color: rgba(0, 0, 0, 0.9);
+}
+
+#targetPlayerMenu {
+    /* Diğer panellerin (Karakter, Envanter) top: 50% ayarını ezer */
+    top: 20px !important; 
+    left: 50% !important;
+    transform: translate(-50%, 0) !important; /* Sadece yatayda ortala */
+    width: 380px; /* Diğer panellerle tutarlı genişlik */
+    z-index: 1001; /* Diğer her şeyin üstünde görünsün */
+}
+
+#targetPlayerActions {
+    display: flex;
+    justify-content: space-around; /* Butonları eşit aralıkla dağıt */
+    padding: 15px;
+}
+
+/* Butonları renklendirelim (buy-btn mavisini ezer) */
+#targetActionWhisper { background-color: #0055aa; border-color: #3388dd; }
+#targetActionInvite { background-color: #00aa55; border-color: #33dd88; }
+#targetActionTrade  { background-color: #aa0055; border-color: #dd3388; }
+
+#targetActionWhisper:hover { background-color: #0066cc; }
+#targetActionInvite:hover { background-color: #00cc66; }
+#targetActionTrade:hover  { background-color: #cc0066; }

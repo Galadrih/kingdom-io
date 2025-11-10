@@ -100,6 +100,18 @@
                 <span id="expText" class="exp-text">0/100</span>
             </div>
         </div>
+
+        <div id="targetPlayerMenu" class="panel hidden">
+    <div class="panel-header">
+        <h3 id="targetPlayerName">Oyuncu Adı</h3>
+        <button id="targetPlayerMenuCloseBtn" class="close-btn">&times;</button>
+    </div>
+    <div id="targetPlayerActions">
+        <button id="targetActionWhisper" class="buy-btn">Mesaj</button>
+        <button id="targetActionInvite" class="buy-btn">Davet</button>
+        <button id="targetActionTrade" class="buy-btn">Ticaret</button>
+    </div>
+</div>
         
         <div id="notificationPanel" class="notification-panel hidden">
             <h4 id="notificationTitle"></h4>
@@ -107,6 +119,18 @@
         </div>
         
         <div id="buffsPanel"></div>
+
+        <div id="gameUI">
+    <div id="chatContainer">
+        <div id="chatMessages">
+            <div class="chat-msg system">Sohbet sistemine hoş geldin!</div>
+        </div>
+        <input type="text" id="chatInput" placeholder="Söylemek için Enter'a basın...">
+    </div>
+    </div>
+
+<div id="characterPanel" class="char-panel hidden">
+    </div>
 
         <div id="actionBar">
             <div class="action-slot" data-slot="1"></div>
@@ -242,6 +266,29 @@
             <span id="playerYangDisplay">0</span>
         </div>
     </div>
+
+    <div id="blacksmithPanel" class="panel hidden">
+    <div class="panel-header">
+        <h3>Demirci</h3>
+        <button id="blacksmithPanelCloseBtn" class="close-btn">&times;</button>
+    </div>
+    <div class="panel-content">
+        <div id="upgradeInterface">
+            <p>Yükseltmek istediğin eşyayı (Silah, Zırh, Kask, Kalkan) buraya sürükle.</p>
+            
+            <div id="upgradeSlot" class="inv-slot" data-tooltip="Eşyayı buraya sürükle">
+            </div>
+            
+            <div id="upgradeInfo">
+                <div id="upgradeItemName">---</div>
+                <div id="upgradeCost">Gerekli Yang: ---</div>
+                <div id="upgradeSuccessChance">Başarı Şansı: ---</div>
+            </div>
+            
+            <button id="upgradeButton" class="buy-btn" disabled>YÜKSELT</button>
+        </div>
+    </div>
+</div>
 
     <div id="warnPanel" class="warn-panel hidden">
         <span id="warnPanelText"></span>

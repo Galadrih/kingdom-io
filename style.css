@@ -797,7 +797,7 @@ button:active {
     width: 500px;
 }
 
-.skill-panel-header, .char-panel-header, .shop-panel-header {
+.skill-panel-header, .char-panel-header, .shop-panel-header, .panel-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -809,13 +809,13 @@ button:active {
     box-shadow: inset 0 -5px 10px rgba(0,0,0,0.5);
 }
 
-.skill-panel-header h3, .char-panel-header h3, .shop-panel-header h3 {
+.skill-panel-header h3, .char-panel-header h3, .shop-panel-header h3, .panel-header h3, .panel-header h4 {
     margin: 0;
     color: #FFD700;
     text-shadow: 1px 1px 3px #000;
 }
 
-#skillPanelCloseBtn, #characterPanelCloseBtn, #shopPanelCloseBtn {
+#skillPanelCloseBtn, #characterPanelCloseBtn, #shopPanelCloseBtn, .close-btn {
     /* GELİŞTİRİLDİ: Daha agresif ve 3D kapatma butonu */
     background: #ff2222;
     color: white;
@@ -828,8 +828,12 @@ button:active {
     font-size: 16px;
     transition: all 0.2s;
     box-shadow: 0 3px 0 #a00, inset 0 0 5px #fcc;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-#skillPanelCloseBtn:hover, #characterPanelCloseBtn:hover, #shopPanelCloseBtn:hover {
+#skillPanelCloseBtn:hover, #characterPanelCloseBtn:hover, #shopPanelCloseBtn:hover, .close-btn:hover {
     background: #ff5555;
     box-shadow: 0 0 15px rgba(255, 85, 85, 1), 0 3px 0 #a00;
     transform: scale(1.1);
@@ -1507,7 +1511,7 @@ button:active {
 }
 .chat-msg.system { color: #FFD700; font-style: italic; } /* Sistem mesajları (sarı) */
 .chat-msg.error { color: #FF4444; font-weight: bold; } /* Hata mesajları (kırmızı) */
-/* (Gelecekte eklenecek: .whisper, .party, .guild) */
+/* (Gelecekte eklenecek: .party, .guild) */
 
 #chatInput {
     border: none;
@@ -1571,6 +1575,7 @@ button:active {
     padding: 10px;
     pointer-events: auto;
     z-index: 10;
+    box-shadow: 0 0 15px rgba(0,0,0,0.8); /* Parti paneline gölge ekle */
 }
 
 #partyMemberList {
@@ -1632,61 +1637,72 @@ button:active {
     cursor: pointer;
 }
 
-/* style.css (dosyanın sonuna eklenecek) */
+/* --- TİCARET PANELLERİ --- */
 
-/* Ticaret Penceresi Ana Konteyneri */
+/* Ticaret Penceresi Ana Konteyneri (TradePanel'in boyutları HTML'de belirtilmeli!) */
+#tradePanel {
+    /* Genel Panel Stillerinden alıyor */
+    width: 650px !important; /* Daha geniş bir ticaret paneli */
+    height: 480px !important; /* Daha uzun bir ticaret paneli */
+}
+
 .trade-container {
     display: flex;
     justify-content: space-between;
-    padding: 10px;
-    height: calc(100% - 90px); /* Başlık ve footer hariç */
+    padding: 15px;
+    height: calc(100% - 70px); /* Başlık ve footer hariç */
+    gap: 15px;
 }
 
 .trade-side {
-    width: 48%;
-    border: 1px solid #555;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
+    width: 49%; /* Boşluk için yer bırak */
+    border: 3px solid #6b471c; /* Kahverengi çerçeve */
+    background: rgba(0, 0, 0, 0.5); /* Koyu arkaplan */
+    border-radius: 8px;
     display: flex;
     flex-direction: column;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
 }
 
 .trade-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 5px 8px;
-    background: rgba(0, 0, 0, 0.4);
-    border-bottom: 1px solid #555;
+    padding: 8px 10px;
+    background: linear-gradient(90deg, #333, #222);
+    border-bottom: 2px solid #6b471c;
+    border-radius: 5px 5px 0 0;
 }
 
 .trade-header span {
     font-weight: bold;
-    color: #ffc;
+    color: #FFD700; /* Altın renkli isimler */
+    text-shadow: 1px 1px 1px #000;
 }
 
 /* Ticaret Onay Durumu (Yeşil/Kırmızı) */
 .trade-status {
-    width: 20px;
-    height: 20px;
+    width: 25px;
+    height: 25px;
     border-radius: 50%;
     background-color: #8B0000; /* Kırmızı (Onaylanmadı) */
-    border: 1px solid #ff0000;
-    box-shadow: 0 0 5px #ff0000;
+    border: 2px solid #ff0000;
+    box-shadow: 0 0 8px #ff0000;
+    transition: all 0.3s ease;
 }
 
 .trade-status.locked {
     background-color: #006400; /* Yeşil (Onaylandı) */
-    border: 1px solid #00ff00;
-    box-shadow: 0 0 5px #00ff00;
+    border: 2px solid #00ff00;
+    box-shadow: 0 0 8px #00ff00;
 }
 
 /* Ticaret Slot Izgarası */
 .trade-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr); /* 3 sütun */
-    gap: 4px;
-    padding: 8px;
+    grid-template-columns: repeat(4, 1fr); /* 4 sütun daha sıkı yerleşim */
+    gap: 6px;
+    padding: 10px;
     flex-grow: 1;
     overflow-y: auto;
 }
@@ -1694,49 +1710,105 @@ button:active {
 .trade-slot {
     width: 100%;
     aspect-ratio: 1 / 1;
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid #444;
-    border-radius: 3px;
-    box-sizing: border-box; /* Önemli */
-    position: relative; /* İkon ve miktar için */
+    /* Envanter slotlarıyla tutarlı bir görünüm */
+    background: radial-gradient(circle at center, #303030 0%, #181818 100%);
+    border: 2px solid #444;
+    border-radius: 6px;
+    box-sizing: border-box; 
+    position: relative; 
+    box-shadow: inset 0 0 8px rgba(0,0,0,1);
+    transition: border-color 0.2s;
 }
 
 .trade-slot img {
-    width: 100%;
-    height: 100%;
+    width: 90%;
+    height: 90%;
     object-fit: contain;
     image-rendering: pixelated;
 }
 
+.trade-slot:hover {
+    border-color: #FFD700;
+}
+
 /* Yang Alanı */
 .trade-yang {
-    padding: 8px;
-    border-top: 1px solid #555;
+    padding: 10px;
+    border-top: 2px solid #6b471c;
     text-align: right;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.trade-yang label {
+    font-size: 14px;
+    color: #f0e6d2;
+    margin-right: 5px;
 }
 
 .trade-yang input {
-    width: 120px;
+    width: 130px;
     background: #111;
-    color: #fff;
+    color: #00ff00; /* Yeşil yang yazısı */
     border: 1px solid #777;
-    padding: 2px 5px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-align: right;
+    font-weight: bold;
+    box-shadow: inset 0 0 5px rgba(0, 255, 0, 0.2);
 }
 
 /* Footer (Onay Butonu) */
 .trade-footer {
-    border-top: 1px solid #555;
-    padding: 8px;
+    border-top: 3px solid #6b471c;
+    padding: 10px 15px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background: linear-gradient(90deg, #332200, #443311);
+    border-radius: 0 0 5px 5px;
+}
+
+#tradeAcceptBtn {
+    background: linear-gradient(180deg, #4CAF50, #2E8B57);
+    border: 3px solid #7CFC00;
+    color: white;
+    font-size: 18px;
+}
+#tradeAcceptBtn:hover {
+    background: linear-gradient(180deg, #66BB6A, #3CB371);
 }
 
 /* Envanterde ticarete konulan eşyayı gri yap */
 .inv-slot.in-trade {
     background-color: #333;
     opacity: 0.5;
+    border-color: #222 !important;
+    transform: none !important;
+    box-shadow: inset 0 0 10px rgba(0,0,0,2) !important;
 }
 .inv-slot.in-trade img {
     filter: grayscale(100%);
+}
+
+#tradeRequestPanel .panel-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 10px 0 20px 0;
+}
+#tradeRequestAccept {
+    background: linear-gradient(180deg, #4CAF50, #2E8B57);
+    border-color: #7CFC00;
+}
+#tradeRequestDecline {
+    background: linear-gradient(180deg, #ff2222, #a00);
+    border-color: #ff7777;
+}
+
+/* --- PARTİ SOHBETİ RENGİ --- */
+.chat-msg.party {
+    color: #87CEEB; /* Açık gök mavisi */
+    font-weight: bold;
+    font-style: italic;
+    background-color: rgba(50, 150, 250, 0.08); /* Hafif mavi arka plan */
 }

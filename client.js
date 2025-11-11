@@ -921,6 +921,51 @@ const assetDefinitions = {
         hitbox: { width: 40, height: 40 }
     },
     // --- DEĞİŞİKLİK SONU ---
+
+    metin_fight: {
+        idle: { 
+            src: "/assets/mobs/metin_fight.png", 
+            frames: 1, 
+            frameWidth: 128, 
+            frameHeight: 128, 
+            pivotX: 64, 
+            pivotY: 128
+        }, 
+        hitbox: { width: 80, height: 80 }
+    },
+    metin_black: {
+        idle: { 
+            src: "/assets/mobs/metin_black.png", 
+            frames: 1, 
+            frameWidth: 128, 
+            frameHeight: 128, 
+            pivotX: 64, 
+            pivotY: 128
+        }, 
+        hitbox: { width: 90, height: 90 }
+    },
+    metin_jealousy: {
+        idle: { 
+            src: "/assets/mobs/metin_jealousy.png", 
+            frames: 1, 
+            frameWidth: 128, 
+            frameHeight: 128, 
+            pivotX: 64, 
+            pivotY: 128
+        }, 
+        hitbox: { width: 100, height: 100 }
+    },
+    metin_soul: {
+        idle: { 
+            src: "/assets/mobs/metin_soul.png", 
+            frames: 1, 
+            frameWidth: 128, 
+            frameHeight: 128, 
+            pivotX: 64, 
+            pivotY: 128
+        }, 
+        hitbox: { width: 110, height: 110 }
+    },
 };
 
 const directionRowMap = { up: 0, left: 1, down: 2, right: 3 };
@@ -1769,24 +1814,24 @@ function kickPlayer(targetPlayerId) {
 // Gerekirse bu fonksiyonun tamamını kopyalayıp eskisiyle değiştir:
 // =================================================================
 function updatePartyUI() {
-    if (!myParty || myParty.members.length <= 1) {
-        partyPanel.classList.add("hidden"); // Parti yoksa veya tek kişiyse paneli gizle
+    // KRİTİK: myParty objesi artık hem üyeleri hem de memberDetails içerir.
+    if (!myParty || myParty.members.length <= 1) { 
+        partyPanel.classList.add("hidden"); 
         return;
     }
     
     partyPanel.classList.remove("hidden");
-    partyMemberList.innerHTML = ""; // Listeyi temizle
+    partyMemberList.innerHTML = ""; 
     
     const amILeader = myParty.leader === mySocketId;
 
-    myParty.members.forEach(memberId => {
-        const member = players[memberId];
+    // YENİ: myParty.memberDetails dizisini kullanıyoruz
+    myParty.memberDetails.forEach(member => {
+        // null veya tanımsız üye verisini atla
         if (!member) return; 
 
-        const isLeader = myParty.leader === memberId;
-        const isMe = memberId === mySocketId;
-        
-        // --- BURASI DEĞİŞTİ (HTML metni yerine element oluşturma) ---
+        const isLeader = myParty.leader === member.id;
+        const isMe = member.id === mySocketId;
         
         // 1. Ana üye kutusunu oluştur
         const memberDiv = document.createElement("div");
@@ -1801,16 +1846,17 @@ function updatePartyUI() {
             
             // ### ÇÖZÜM: Olayı metin olarak değil, doğrudan ata ###
             kickButton.onclick = () => {
-                kickPlayer(memberId);
+                kickPlayer(member.id); // member.id'yi kullanıyoruz
             };
             
-            memberDiv.appendChild(kickButton); // Butonu üye kutusuna ekle
+            memberDiv.appendChild(kickButton); 
         }
 
         // 3. İsim elementini oluştur ve ekle
         const nameDiv = document.createElement("div");
         nameDiv.className = "party-member-name";
-        nameDiv.textContent = `${isLeader ? '★ ' : ''}${member.name}`;
+        // Seviyeyi ve HP/MaxHP'yi isme ekleyelim
+        nameDiv.textContent = `${isLeader ? '★ ' : ''}${member.name} (Lv.${member.level})`;
         memberDiv.appendChild(nameDiv);
 
         // 4. HP Bar elementlerini oluştur ve ekle
@@ -1819,15 +1865,16 @@ function updatePartyUI() {
         
         const hpDiv = document.createElement("div");
         hpDiv.className = "hp";
-        hpDiv.style.width = `${(member.hp / member.maxHp) * 100}%`;
+        
+        // YENİ: Anlık HP ve Max HP'yi kullanarak bar genişliğini ayarla
+        const hpPercent = member.maxHp > 0 ? (member.hp / member.maxHp) * 100 : 0;
+        hpDiv.style.width = `${Math.min(100, hpPercent)}%`; // Yüzde 100'ü geçmesin
         
         barDiv.appendChild(hpDiv);
         memberDiv.appendChild(barDiv);
 
         // 5. Tamamlanan üye kutusunu listeye ekle
         partyMemberList.appendChild(memberDiv);
-        
-        // --- DEĞİŞİKLİK SONU ---
     });
 }
 
@@ -2113,47 +2160,49 @@ function updateSellPanelUI() {
  * message: Mesaj metni
  */
 function addMessageToChat(data) {
-    if (!chatMessages) return;
+    const { type, sender, target, message } = data;
 
-    const { type = 'general', sender, message, target } = data;
-    
     const msgDiv = document.createElement("div");
     msgDiv.classList.add("chat-msg");
-    
     let htmlContent = "";
 
+    // Sohbet tiplerine göre mesajı biçimlendir
     if (type === 'system') {
         msgDiv.classList.add("system");
-        htmlContent = `[Sistem] ${message}`;
+        htmlContent = `<span class="system-tag">[Sistem]</span> ${message}`;
+
     } else if (type === 'error') {
         msgDiv.classList.add("error");
-        htmlContent = `[Hata] ${message}`;
-        
-    // =================================================================
-    // ### YENİ EKLENEN FISILTI BLOKLARI ###
-    // =================================================================
-    } else if (type === 'whisper_sent') {
-        msgDiv.classList.add("whisper"); // Yeni CSS sınıfı
-        // Gönderdiğimiz fısıltı (hedef oyuncunun adını gösterir)
-        htmlContent = `<strong>-> [${target}]:</strong> ${message}`;
-        
-    } else if (type === 'whisper_received') {
-        msgDiv.classList.add("whisper"); // Yeni CSS sınıfı
-        // Aldığımız fısıltı (gönderen oyuncunun adını gösterir)
-        htmlContent = `<strong>[${sender}] ->:</strong> ${message}`;
-    // =================================================================
-    // ### YENİ BLOKLAR SONU ###
-    // =================================================================
+        htmlContent = `<span class="error-tag">[HATA]</span> ${message}`;
 
+    } else if (type === 'whisper_received') {
+        msgDiv.classList.add("whisper-received");
+        htmlContent = `<strong>[Fısıltı < ${sender}]:</strong> ${message}`;
+
+    } else if (type === 'whisper_sent') {
+        msgDiv.classList.add("whisper-sent");
+        htmlContent = `<strong>[Fısıltı > ${target}]:</strong> ${message}`;
+
+    // =================================================================
+    // ### YENİ EKLENEN PARTİ SOHBETİ BLOKU ###
+    // =================================================================
+    } else if (type === 'party') {
+        msgDiv.classList.add("party");
+        // Partideki herkesin gördüğü mesaj
+        htmlContent = `<strong>[Parti] ${sender}:</strong> ${message}`;
+    // =================================================================
+    
     } else { // 'general'
         // Normal genel sohbet
+        msgDiv.classList.add("general");
         htmlContent = `<strong>${sender}:</strong> ${message}`;
     }
-    
+
+    // Mesajı div'e ekle
     msgDiv.innerHTML = htmlContent;
     chatMessages.appendChild(msgDiv);
-    
-    // Otomatik olarak en alta kaydır
+
+    // Sohbet penceresini aşağı kaydır
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
@@ -2458,7 +2507,7 @@ function updateAnimations() {
     }
 
 
-    // 2. MOB ANİMASYONLARI (Bu bölüm doğruydu, aynı kalır)
+    // 2. MOB ANİMASYONLARI
     for (const id in mobs) {
         const p = mobs[id];
         if (!p.asset) continue; 
@@ -2468,8 +2517,8 @@ function updateAnimations() {
             animData[mobId] = { 
                 animFrame: 0, 
                 animTicker: 0, 
-                prevAnimState: "idle", 
-                direction: "down",
+                prevAnimState: p.animState || "idle", 
+                direction: p.direction || "down",
                 hurtPlayed: false    
             };
         }
@@ -2480,57 +2529,53 @@ function updateAnimations() {
         
         const isSingleSheet = !!mobAsset.animations; 
         
-        let currentStateKey = "idle";
+        // Sunucudan gelen en güncel durumu al
+        const currentStateKey = p.animState || "idle"; 
         
-        let mobConfig = isSingleSheet ? mobAsset.animations.idle : mobAsset.idle;
+        let mobConfig;
         
-        if (!p.isAlive) {
-            currentStateKey = "hurt";
-        } 
-        else if (p.targetId && players[p.targetId]) {
-             const target = players[p.targetId];
-             const mobAttackRange = p.attackRange || 50; 
-             const dist = distance({x: p.x, y: p.y, width: p.width, height: p.height}, target); 
-             
-             if (dist <= mobAttackRange * 1.5) { 
-                 currentStateKey = "attack";
-             } else {
-                 currentStateKey = "walk";
-             }
-             
-             const angle = Math.atan2(target.y - p.y, target.x - p.x);
-             if (angle >= -Math.PI / 4 && angle <= Math.PI / 4) ad.direction = "right";
-             else if (angle > Math.PI / 4 && angle <= 3 * Math.PI / 4) ad.direction = "down";
-             else if (angle < -Math.PI / 4 && angle >= -3 * Math.PI / 4) ad.direction = "up";
-             else ad.direction = "left";
-        }
-        
+        // Animasyon konfigürasyonunu belirle
         if (isSingleSheet) { 
-            const animConfig = mobAsset.animations[currentStateKey];
-            if (animConfig) mobConfig = animConfig;
+             mobConfig = mobAsset.animations[currentStateKey] || mobAsset.animations["idle"];
         } else { 
-            const state = mobAsset[currentStateKey];
-            if (state) mobConfig = state;
+             mobConfig = mobAsset[currentStateKey] || mobAsset["idle"];
         }
-
+        
         if (!mobConfig) continue; 
 
-        const tickSpeed = mobConfig.speed || p.idleSpeed || 30;
+        // KRİTİK: Mob'un hızı hareket durumuna göre belirlenir.
+        let tickSpeed;
+        if (currentStateKey === "walk") {
+             // Yürüme animasyonu için daha hızlı tickSpeed (daha akıcı)
+             tickSpeed = 8; 
+        } else if (currentStateKey === "attack") {
+             tickSpeed = 6; 
+        } else {
+             // idle veya hurt için mob'un kendi idleSpeed değerini kullan (daha yavaş)
+             tickSpeed = p.idleSpeed || 30; 
+        }
+        
         const frames = mobConfig.totalFrames || mobConfig.frames; 
 
+        // Sunucudan gelen animState değiştiyse, animasyonu sıfırla
         if (ad.prevAnimState !== currentStateKey) {
             ad.animFrame = 0;
             ad.animTicker = 0;
             ad.prevAnimState = currentStateKey;
+            ad.hurtPlayed = (currentStateKey === "hurt" ? ad.hurtPlayed : false); 
         }
         
+        // Yönü sunucudan gelen değerle senkronize et
+        ad.direction = p.direction || "down"; 
+
+
         if (currentStateKey === "hurt" && ad.hurtPlayed) {
-            // Animasyonu son karede (frames - 1) dondur
+            // Animasyonu son karede dondur
             ad.animFrame = frames - 1; 
         } else {
             // Normal animasyon döngüsü
             ad.animTicker++;
-            if (ad.animTicker >= tickSpeed) {
+            if (ad.animTicker >= tickSpeed) { // <<< Mobun kendi hızını kullan
                 ad.animTicker = 0;
                 ad.animFrame = (ad.animFrame + 1) % frames;
                 
@@ -2541,8 +2586,7 @@ function updateAnimations() {
             }
         }
         
-        p.direction = ad.direction; 
-        p.animState = currentStateKey;
+        // p objesini client'ta güncellemeyi durdurduk, sunucudan gelen değerler kullanılacak.
     }
 }
 
@@ -2680,30 +2724,60 @@ function draw() {
         const mobAnimData = animData[mobId]; 
         
         const mobAsset = mob.asset ? assetDefinitions[mob.asset] : null;
+
         // YENİ: Ölüm animasyonu ve 2 saniye bekleme
         let isFadingOut = false;
         if (!mob.isAlive) {
             const now = Date.now();
-            // Sunucudan gelen deathTime'ı kullan
-            const deathTime = mob.deathTime || (now - MOB_RESPAWN_TIME); // (Eğer deathTime henüz gelmediyse 10sn geçmiş varsay)
+            const deathTime = mob.deathTime || (now - MOB_RESPAWN_TIME); 
             const timeSinceDeath = now - deathTime;
 
             if (timeSinceDeath > 2000) {
-                // 2 saniye geçti, artık çizmeyi bırak
                 continue;
             }
             
             isFadingOut = true;
-            // 2 saniye boyunca yavaşça sol (fade-out)
             ctx.globalAlpha = 1.0 - (timeSinceDeath / 2000);
         }
         // --- YENİ KOD SONU ---
 
+        
+        // --- YENİ: METİN TAŞI HP/İSİM ÇİZİMİ ---
+        if (mob.isMetin) {
+            const hpPercent = (mob.hp / mob.maxHp) * 100;
+            const barWidth = 100; // Metin için sabit bar genişliği
+            const barX = mob.x + (mob.width / 2) - (barWidth / 2);
+            const barY = mob.y - 25; 
+            
+            // Metin HP Barı (Mor)
+            ctx.fillStyle = "#3a0050"; 
+            ctx.fillRect(barX, barY, barWidth, 6);
+            ctx.fillStyle = "#8B00FF"; // Can dolduran mor renk
+            ctx.fillRect(barX, barY, (barWidth * hpPercent) / 100, 6);
+            
+            // Kalan Mob Hakkı Çizgileri
+            const segmentWidth = barWidth / (mob.maxSpawnCount || 1);
+            ctx.strokeStyle = "#FFFFFF";
+            ctx.lineWidth = 1;
+            for(let i = 1; i < mob.maxSpawnCount; i++) {
+                ctx.beginPath();
+                ctx.moveTo(barX + (segmentWidth * i), barY);
+                ctx.lineTo(barX + (segmentWidth * i), barY + 6);
+                ctx.stroke();
+            }
+            
+            // İsim ve Seviye
+            ctx.fillStyle = "#FFD700";
+            ctx.font = "14px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(`${mob.type} Lv.${mob.level}`, mob.x + mob.width / 2, mob.y - 10);
+        }
+        // --- METİN ÇİZİM SONU ---
+
+
         if (mobAsset) {
             
             const currentStateKey = mob.animState || "idle";
-            
-            
             
             if (!mobAnimData) continue; 
             
@@ -2750,25 +2824,26 @@ function draw() {
             ctx.drawImage(img, frameX, frameY, state.frameWidth, state.frameHeight, 
                           drawX, drawY, state.frameWidth, state.frameHeight);
             
-            const hpPercent = (mob.hp / mob.maxHp) * 100;
-            const barWidth = hitbox.width * 1.5; 
-            const barX = mob.x + (mob.width / 2) - (barWidth / 2);
-            const barY = mob.y - 15; 
-            
-            ctx.fillStyle = "red";
-            ctx.fillRect(barX, barY, barWidth, 4);
-            ctx.fillStyle = mob.color; 
-            ctx.fillRect(barX, barY, (barWidth * hpPercent) / 100, 4);
+            // Normal Moblar için HP Barı (Metin değilse)
+            if (!mob.isMetin) {
+                const hpPercent = (mob.hp / mob.maxHp) * 100;
+                const barWidth = hitbox.width * 1.5; 
+                const barX = mob.x + (mob.width / 2) - (barWidth / 2);
+                const barY = mob.y - 15; 
+                
+                ctx.fillStyle = "red";
+                ctx.fillRect(barX, barY, barWidth, 4);
+                ctx.fillStyle = mob.color; 
+                ctx.fillRect(barX, barY, (barWidth * hpPercent) / 100, 4);
 
-            ctx.fillStyle = "white";
-            ctx.font = "10px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText(`${mob.type} Lv.${mob.level}`, mob.x + mob.width / 2, mob.y - 5);
-
-
+                ctx.fillStyle = "white";
+                ctx.font = "10px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText(`${mob.type} Lv.${mob.level}`, mob.x + mob.width / 2, mob.y - 5);
+            }
         }
         
-        // YENİ: Eğer bu mob için saydamlık kullandıysak, bir sonrakine geçmeden sıfırla
+        // Eğer bu mob için saydamlık kullandıysak, bir sonrakine geçmeden sıfırla
         if (isFadingOut) {
             ctx.globalAlpha = 1.0;
         }
@@ -2884,7 +2959,7 @@ function draw() {
 
     ctx.restore(); 
 
-} 
+}
 
 // --------------------------- OYUN DÖNGÜSÜ ---------------------------
 function gameLoop() {
@@ -2913,6 +2988,13 @@ function initializeGameGraphics() {
         if (a.attack && a.attack.src) sources[a.attack.src] = true; 
     }
     for (const m in CLIENT_MAP_DATA) sources[CLIENT_MAP_DATA[m].src] = true;
+
+    // YENİ METİN VARLIKLARI BURAYA EKLENDİ
+    sources["/assets/mobs/metin_fight.png"] = true; 
+    sources["/assets/mobs/metin_black.png"] = true;
+    sources["/assets/mobs/metin_jealousy.png"] = true;
+    sources["/assets/mobs/metin_soul.png"] = true;
+    // YENİ METİN VARLIKLARI EKLEME SONU
 
     let loaded = 0;
     const total = Object.keys(sources).length;
@@ -3125,8 +3207,9 @@ function openTradeWindow(data) {
         }
     };
 
-    // Pencereyi göster
+    // Pencereyi göster (KRİTİK: Hem sınıfı kaldır, hem de stili zorla)
     tradePanel.classList.remove("hidden");
+    tradePanel.style.display = "flex"; // Veya "block". Panel içeriğine uygun olmalı.
 }
 
 function closeTradeUI() {
@@ -3135,7 +3218,10 @@ function closeTradeUI() {
     
     // Pencereyi gizle
     if (tradePanel) {
-        tradePanel.classList.add("hidden"); 
+        // 1. Standart gizleme sınıfını ekle
+        tradePanel.classList.add("hidden");
+        // 2. KRİTİK: Inline stil ile görünürlüğü zorla KAPAT
+        tradePanel.style.display = "none"; 
     }
     
     // Diğer elementleri temizle
@@ -3143,36 +3229,36 @@ function closeTradeUI() {
         tradeConfirmStatus.textContent = "";
     }
     if (tradeAcceptBtn) {
-        tradeAcceptBtn.disabled = false; // Butonu yeniden aktifleştir
+        tradeAcceptBtn.disabled = false;
+        tradeAcceptBtn.textContent = "Kabul Et";
+        tradeAcceptBtn.style.background = "";
     }
     
-    // Envanterdeki "in-trade" sınıfını temizle
-    updateInventoryUI();
-    
-    // Yang alanını temizle/sıfırla
     if (myTradeYang) {
         myTradeYang.value = 0;
     }
     
-    console.log("Ticaret UI temizlendi ve pencere gizlendi.");
+    // Envanterdeki "in-trade" sınıfını temizle ve UI'ı zorla güncelle
+    updateInventoryUI();
+    
+    // gameState'ten gelen bir sonraki güncellemenin, envanterin eski halini göstermesini engelle
+    lastInventoryState = JSON.stringify([]); 
+    
+    console.log("Ticaret UI temizlendi ve pencere ZORLA gizlendi.");
 }
-
-
 /**
  * Ticaret penceresini kapatır ve oturumu sıfırlar.
  */
 function closeTradeWindow() {
     if (currentTradeSession) {
-        // Kullanıcı butona bastığı için sunucuya iptal ettiğimizi bildir
-        // Sunucu bu sinyali aldıktan sonra "tradeCancelled" eventini geri gönderecektir.
+        // Kullanıcı butona bastığı için sunucuya iptal ettiğimizi bildir.
         socket.emit("cancelTrade"); 
         
-        // Bu yüzden burada closeTradeUI() çağırmaya gerek yok,
-        // tradeCancelled eventinin gelmesini bekliyoruz.
-        // Ancak bu satırları koyarsak daha hızlı kapanır:
-        closeTradeUI(); // Hemen kapat, sunucudan onay gelince tekrar temizler/kapatır (fark etmez)
+        // Hızlı kullanıcı deneyimi için hemen gizle. Sunucu onayını beklesek bile, 
+        // bu komut manuel tıklamayla aynı etkiyi yaratmalıdır.
+        closeTradeUI(); 
     } else {
-        closeTradeUI(); // Zaten bir oturum yoksa yine de kapat
+        closeTradeUI(); // Oturum yoksa yine de temizle/kapat
     }
 }
 /**
@@ -3409,30 +3495,24 @@ socket.on("tradeOfferUpdate", (data) => {
     }
 });
 
+// client.js (socket.on("tradeSuccess") dinleyicisinin GÜNCEL HALİ)
+
 socket.on("tradeSuccess", (data) => {
     // data = { message: "..." }
     
     // 1. Bildirimi göster
     showNotification({ title: "Ticaret Başarılı", message: data.message });
     
-    // 2. KAPANMA MEKANİZMASI (Try-Catch ile kesinleştirme)
-    try {
-        currentTradeSession = null;
-        // KRİTİK: Eğer tanımlıysa, gizle.
-        if (tradePanel) tradePanel.classList.add("hidden"); 
-        tradeConfirmStatus.textContent = "";
-        
-        // 3. Envanteri güncelle
-        updateInventoryUI();
-        lastInventoryState = "[]"; 
-        lastEquipmentState = "{}";
-        
-    } catch(e) {
-        console.error("tradeSuccess: Kapanma sırasında hata!", e);
-        // Hata durumunda bile pencereyi kapatmaya zorla
-        document.getElementById("tradePanel")?.classList.add("hidden");
+    // 2. KRİTİK: X butonunun olayını programatik olarak tetikle
+    if (tradeCancelBtn) {
+        tradeCancelBtn.click(); // <<< closeTradeWindow'u tetikler
+    } else {
+        // Yedek olarak normal fonksiyonu çağır
+        closeTradeWindow();
     }
 });
+
+// client.js (socket.on("tradeCancelled") dinleyicisinin GÜNCEL HALİ)
 
 socket.on("tradeCancelled", (data) => {
     // data = { message: "..." }
@@ -3440,23 +3520,36 @@ socket.on("tradeCancelled", (data) => {
     // 1. Bildirimi göster
     showNotification({ title: "Ticaret İptal", message: data.message });
     
-    // 2. KAPANMA MEKANİZMASI (Try-Catch ile kesinleştirme)
-     try {
-        currentTradeSession = null;
-        // KRİTİK: Eğer tanımlıysa, gizle.
-        if (tradePanel) tradePanel.classList.add("hidden"); 
-        tradeConfirmStatus.textContent = "";
-        
-        // 3. Envanteri güncelle
-        updateInventoryUI();
-        lastInventoryState = "[]";
-        
-    } catch(e) {
-        console.error("tradeCancelled: Kapanma sırasında hata!", e);
-        document.getElementById("tradePanel")?.classList.add("hidden");
+    // 2. KRİTİK: X butonunun olayını programatik olarak tetikle
+    if (tradeCancelBtn) {
+        tradeCancelBtn.click(); // <<< closeTradeWindow'u tetikler
+    } else {
+        // Yedek olarak normal fonksiyonu çağır
+        closeTradeWindow();
     }
 });
 
+socket.on("tradeFinished", (data) => {
+    // Sunucu ticaretin bittiğini (başarılı veya iptal) bu olayla bildirir.
+    
+    // Gerekirse bir uyarı göster (örn: "Ticaret Başarılı!")
+    if (data.message) {
+        showWarning(data.message); 
+    }
+    
+    // PENCEREYİ ZORLA KAPAT
+    closeTradeUI(); 
+    
+    // Envanter ve Yang güncellemelerini işle
+    if (data.inventory) {
+        inventory = data.inventory;
+    }
+    // Yang güncellemesi (Eğer sunucu yang miktarını yolluyorsa)
+    if (data.yang !== undefined) {
+        players[mySocketId].yang = data.yang;
+        updateUI(); 
+    }
+});
 
 
 socket.on("itemToInventory", (item) => {
@@ -3470,13 +3563,26 @@ socket.on("itemToInventory", (item) => {
 });
 
 socket.on("itemSold", (data) => {
-    if (data.inventoryIndex !== undefined && inventory[data.inventoryIndex]) {
-        inventory[data.inventoryIndex] = null;
+    // data = { inventoryIndex: <index> }
+    
+    const index = data.inventoryIndex;
+    
+    // 1. KRİTİK: Yerel envanter dizisindeki öğeyi KALICI OLARAK sil (null yap)
+    if (index !== undefined && inventory[index]) {
+        inventory[index] = null;
     }
     
+    // 2. Envanter UI'ını güncelle (silinen eşya kaybolur)
     updateInventoryUI(); 
+    
+    // 3. Satış panelini güncelle (satılan eşya listeden kaybolur)
     updateSellPanelUI(); 
+    
+    // 4. (Opsiyonel ama önerilen): gameState ile eşitleme titremesini engellemek için
+    // Son envanter durumunu geçersiz kıl (ServerGameLoop titremesini engeller)
+    lastInventoryState = JSON.stringify(inventory);
 });
+
 
 socket.on("itemEquipped", (data) => {
     if (data.inventoryIndex !== undefined && inventory[data.inventoryIndex]) {

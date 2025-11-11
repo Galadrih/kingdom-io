@@ -39,6 +39,9 @@ let lastMobId = 0;
 let parties = {};
 let activeTrades = {};
 
+let deadMetins = {}; // YENİ: Ölen metinleri ve ne zaman dirileceklerini tutar
+const METIN_RESPAWN_TIME = 60000; // YENİ: 1 dakika (60 saniye) sonra dirilir
+
 // ---------------------- EŞYA VERİTABANI ----------------------
 // ---------------------- EŞYA VERİTABANI ----------------------
 const ITEM_DB = {
@@ -258,6 +261,52 @@ const SHOP_DB = {
 
 const POT_COOLDOWN_MS = 1000; // 1 saniye bekleme süresi
 
+
+const METIN_TYPES = [
+    // --- BAŞLANGIÇ KÖY METİNLERİ (Lv 1 - 15) ---
+    { 
+        type: "Metin of Fight", color: "#B80000", baseHp: 500, size: 80, 
+        levelRange: [5, 10], exp: 100, dropRate: 0.9,
+        // İçinden çıkacak moblar (Seviye 1-10 aralığında)
+        mobTypes: ["Wolf", "Pig", "Boar", "Snake"], 
+        mobLevelRange: [1, 10], 
+        mobCount: [3, 5], // Tek seferde çıkacak canavar sayısı
+        spawnCount: 3,    // Toplamda kaç kez canavar çıkaracağı
+        asset: "metin_fight" 
+    },
+    { 
+        type: "Metin of Black", color: "#222222", baseHp: 800, size: 90, 
+        levelRange: [10, 15], exp: 200, dropRate: 1.0, 
+        mobTypes: ["Wolf", "Boar", "Alpha Wolf"], 
+        mobLevelRange: [5, 15], 
+        mobCount: [5, 7], 
+        spawnCount: 4,    
+        asset: "metin_black" 
+    },
+    
+    // --- ORMAN METİNLERİ (Lv 21 - 40) ---
+    { 
+        type: "Metin of Jealousy", color: "#006400", baseHp: 1500, size: 100, 
+        levelRange: [25, 30], exp: 500, dropRate: 1.0, 
+        mobTypes: ["Orc", "Demon", "Spirit", "Forest Spider"], 
+        mobLevelRange: [20, 30], 
+        mobCount: [7, 9], 
+        spawnCount: 5,    
+        asset: "metin_jealousy" 
+    },
+    { 
+        type: "Metin of Soul", color: "#FFD700", baseHp: 2000, size: 110, 
+        levelRange: [35, 40], exp: 800, dropRate: 1.0, 
+        mobTypes: ["Demon", "Spirit", "Golem", "Giant Spider"], 
+        mobLevelRange: [30, 40], 
+        mobCount: [9, 11], 
+        spawnCount: 6,    
+        asset: "metin_soul" 
+    },
+    
+    // Yüksek seviye metinler (ileride eklenebilir)
+    // ...
+];
 
 // ---------------------- MOB VERİTABANI ----------------------
 const MOB_TYPES = [
@@ -604,7 +653,7 @@ const MAP_DATA = {
   village: {
     width: 6440,
     height: 4480,
-    safeZone: { x: 3200, y: 3000, radius: 600 }, // YENİ: Güvenli bölge tanımı
+    safeZone: { x: 3200, y: 3000, radius: 1200 },
     portals: [
       { x: 3120, y: 0, width: 200, height: 40, targetMap: "forest", targetX: 3080, targetY: 4300 },
     ],
@@ -1042,40 +1091,254 @@ function spawnMob(mapName) { // YENİ: mapName argümanı eklendi
   mobs[mob.id] = mob;
 }
 
+
+
+// server.js (spawnMetin fonksiyonunun GÜNCELLENMİŞ TAMAMI)
+
+function spawnMetin(mapName) { 
+    const map = MAP_DATA[mapName];
+    if (!map) return;
+
+    // Harita seviyesine uygun Metinleri filtrele
+    const validMetins = METIN_TYPES.filter(m => {
+        return m.levelRange[1] >= map.allowedLevelRange[0] && m.levelRange[0] <= map.allowedLevelRange[1];
+    });
+    
+    if (validMetins.length === 0) return;
+
+    const metinType = validMetins[Math.floor(Math.random() * validMetins.length)];
+
+    // Güvenli Bölge Dışında Rastgele Konum Bulma (spawnMob ile aynı mantık)
+    const safeZone = map.safeZone || { x: map.width / 2, y: map.height / 2, radius: 0 };
+    const mapCenter = { x: safeZone.x, y: safeZone.y }; 
+    const safeZoneRadius = safeZone.radius; 
+    
+    let spawnX, spawnY, distanceToCenter;
+    let attempts = 0;
+    const maxAttempts = 100;
+
+    do {
+      spawnX = Math.random() * map.width;
+      spawnY = Math.random() * map.height;
+      
+      const dx = spawnX - mapCenter.x;
+      const dy = spawnY - mapCenter.y;
+      distanceToCenter = Math.sqrt(dx * dx + dy * dy);
+      attempts++;
+      
+    } while (distanceToCenter < safeZoneRadius && attempts < maxAttempts); 
+    
+    if (attempts >= maxAttempts && distanceToCenter < safeZoneRadius) return;
+
+    // Seviyeyi aralık içinde rastgele belirle
+    const level = metinType.levelRange[0] + Math.floor(Math.random() * (metinType.levelRange[1] - metinType.levelRange[0] + 1));
+
+    // Metin Mob objesini oluştur
+    const metin = {
+        id: ++lastMobId,
+        type: metinType.type,
+        map: mapName, 
+        x: spawnX, 
+        y: spawnY, 
+        spawnX: spawnX, 
+        spawnY: spawnY, 
+        width: metinType.size,
+        height: metinType.size,
+        color: metinType.color, // Metinler için kullanılmayacak ama kalsın
+        level: level,
+        hp: metinType.baseHp, // Metinlerin HP'si sabittir
+        maxHp: metinType.baseHp,
+        dmg: 0, // Metinler saldıramaz
+        exp: metinType.exp,
+        dropRate: metinType.dropRate,
+        drops: [], // Metinler kendi drop havuzuna sahip
+        isAlive: true,
+        animFrame: 0,
+        animTicker: 0,
+        asset: metinType.asset,      
+        isAggressive: false,
+        moveSpeed: 0,
+        attackRange: 0,
+        
+        isMetin: true,          // KRİTİK: Bu bir Metin taşıdır
+        spawnMobTypes: metinType.mobTypes,
+        spawnMobLevelRange: metinType.mobLevelRange,
+        mobSpawnCount: metinType.mobCount,
+        spawnCount: metinType.spawnCount,    // Kalan dalga sayısı
+        maxSpawnCount: metinType.spawnCount, // Toplam dalga sayısı
+        // hpThreshold: metinType.baseHp / metinType.spawnCount // Bu artık gereksiz, attack eventinde dinamik hesaplanıyor
+    };
+
+    mobs[metin.id] = metin;
+}
+
+// server.js (spawnMob fonksiyonunu bulun)
+
+/**
+ * Normal bir mob'u haritada uygun bir konuma yerleştirir.
+ * @param {string} mapName - Harita adı.
+ * @param {object} [options] - Opsiyonel: Metin içinden spawn ediliyorsa (parentX, parentY, forcedType, forcedLevel).
+ */
+function spawnMob(mapName, options = {}) { 
+    // KRİTİK DÜZELTME: map değişkenini fonksiyonun başında tanımla
+    const map = MAP_DATA[mapName];
+    if (!map) return; // Harita verisi yoksa çık
+
+    const mapLevelRange = map.allowedLevelRange || [1, 99]; 
+    const safeZone = map.safeZone || { x: map.width / 2, y: map.height / 2, radius: 0 };
+    const mapCenter = { x: safeZone.x, y: safeZone.y }; 
+    const safeZoneRadius = safeZone.radius; 
+
+    let spawnX, spawnY, level, mobType;
+
+    if (options.parentX !== undefined) {
+        // Metin içinden çıkıyorsa: Metinin etrafına rastgele konumlandır
+        spawnX = options.parentX + (Math.random() * 100 - 50);
+        spawnY = options.parentY + (Math.random() * 100 - 50);
+        
+        // Metin'den gelen zorunlu tip ve seviyeyi kullan
+        mobType = MOB_TYPES.find(m => m.type === options.forcedType);
+        level = options.forcedLevel;
+        
+    } else {
+        // Normal harita spawn:
+        
+        // 1. Güvenli Bölge Dışında Rastgele Konum Bul
+        let attempts = 0;
+        const maxAttempts = 100;
+        let distanceToCenter;
+        
+        do {
+          spawnX = Math.random() * map.width;
+          spawnY = Math.random() * map.height;
+          
+          const dx = spawnX - mapCenter.x;
+          const dy = spawnY - mapCenter.y;
+          distanceToCenter = Math.sqrt(dx * dx + dy * dy);
+          attempts++;
+          
+        } while (distanceToCenter < safeZoneRadius && attempts < maxAttempts); 
+        
+        if (attempts >= maxAttempts && distanceToCenter < safeZoneRadius) return;
+
+
+        // 2. Konuma Göre Seviye Aralığı Belirle (Kademeli Zorluk)
+        let targetLevelMin = mapLevelRange[0];
+        let targetLevelMax = mapLevelRange[1];
+
+        if (map.zones) {
+            let currentZone = null;
+            if (map.zones.length === 1) {
+                currentZone = map.zones[0];
+            } else {
+                currentZone = map.zones.find(zone => distanceToCenter <= zone.maxRadius);
+            }
+            
+            if (currentZone) {
+                targetLevelMin = currentZone.levelMin;
+                targetLevelMax = currentZone.levelMax;
+            }
+        }
+
+        // 3. Bölge Seviye Aralığına Uyan Mobları Filtrele
+        const validMobs = MOB_TYPES.filter(m => {
+          return m.levelRange[1] >= targetLevelMin && m.levelRange[0] <= targetLevelMax;
+        });
+        
+        if (validMobs.length === 0) {
+          return;
+        }
+        
+        // 4. Mob tipini rastgele seç
+        mobType = validMobs[Math.floor(Math.random() * validMobs.length)];
+        
+        // 5. Mob seviyesini aralık içinde rastgele belirle
+        const levelMin = Math.max(mobType.levelRange[0], targetLevelMin);
+        const levelMax = Math.min(mobType.levelRange[1], targetLevelMax);
+        
+        if (levelMin > levelMax) return; 
+        
+        level = levelMin + Math.floor(Math.random() * (levelMax - levelMin + 1));
+        
+    } 
+
+    // 6. Mob objesini oluştur
+    const mob = {
+        id: ++lastMobId,
+        type: mobType.type,
+        map: mapName,
+        x: spawnX, 
+        y: spawnY, 
+        spawnX: spawnX, 
+        spawnY: spawnY, 
+        width: mobType.size,
+        height: mobType.size,
+        color: mobType.color,
+        level: level,
+        hp: mobType.baseHp + level * 5,
+        maxHp: mobType.baseHp + level * 5,
+        dmg: mobType.dmg + Math.floor(level / 3),
+        exp: mobType.exp + level * 2,
+        dropRate: mobType.dropRate,
+        drops: mobType.drops,
+        isAlive: true,
+        animFrame: 0,
+        animTicker: 0,
+        
+        asset: mobType.asset,      
+        idleSpeed: mobType.idleSpeed, 
+        
+        isAggressive: mobType.isAggressive || false,
+        moveSpeed: mobType.moveSpeed || 3,
+        aggroRange: mobType.aggroRange || 200,
+        attackRange: mobType.attackRange || 50,
+        attackSpeed: mobType.attackSpeed || 1000,
+        lastAttack: 0,
+        targetId: null, 
+        isLeashing: false 
+    };
+
+    mobs[mob.id] = mob;
+}
+
 // server.js
 
-function giveExp(player, exp) {
-  player.exp += exp;
-  while (player.exp >= player.maxExp) {
-    player.level++;
-    player.skillPoints++; // Bu satır zaten vardı
-    player.statPoints += 3; // <-- YENİ EKLENECEK SATIR BUDUR
-    player.exp -= player.maxExp;
-    player.maxExp = Math.floor(player.maxExp * 1.5);
-    player.hp = player.maxHp;
-    player.mp = player.maxMp;
+function giveExp(playersToGive, exp) {
+    // Tek bir oyuncu objesi geldiyse, onu 1 elemanlı bir diziye çevir
+    const recipients = Array.isArray(playersToGive) ? playersToGive : [playersToGive];
+    
+    // Basit dağıtım: Toplam EXP'yi üye sayısına böl
+    const expPerPlayer = Math.floor(exp / recipients.length);
+    
+    recipients.forEach(player => {
+        // Herkese eşit payı ver
+        player.exp += expPerPlayer;
+        
+        // Seviye atlama kontrolü (Mevcut logic aynı kalır)
+        while (player.exp >= player.maxExp) {
+            player.level++;
+            player.skillPoints++; 
+            player.statPoints += 3;
+            player.exp -= player.maxExp;
+            player.maxExp = Math.floor(player.maxExp * 1.5);
+            player.hp = player.maxHp;
+            player.mp = player.maxMp;
 
-    // YENİ EKLENEN BİLDİRİM KONTROLÜ
-    // Eğer oyuncu 5. seviyeye ulaştıysa VE henüz bir beceri seti seçmediyse
-    if (player.level === 5 && player.skillSet === null) {
-      // Sadece bu oyuncunun client'ına özel bir event gönder
-      const socket = io.sockets.sockets.get(player.id);
-      if (socket) {
-        socket.emit("showNotification", {
-          title: "Beceri Ustası",
-          message: `Tebrikler, 5. Seviye oldun! Köydeki sınıf ustana (${player.class} Ustası) giderek ilk becerilerini öğrenebilirsin.`
-        });
-      }
-    }
-    // YENİ KONTROL SONU
-  }
+            // 5. Seviye beceri bildirimi
+             if (player.level === 5 && player.skillSet === null) {
+              const socket = io.sockets.sockets.get(player.id);
+              if (socket) {
+                socket.emit("showNotification", {
+                  title: "Beceri Ustası",
+                  message: `Tebrikler, 5. Seviye oldun! Köydeki sınıf ustana (${player.class} Ustası) giderek ilk becerilerini öğretebilirsin.`
+                });
+              }
+            }
+        }
+    });
 }
 
-function distance(a, b) {
-  const dx = a.x + a.width / 2 - (b.x + b.width / 2);
-  const dy = a.y + a.height / 2 - (b.y + b.height / 2);
-  return Math.sqrt(dx * dx + dy * dy);
-}
+
 
 // YENİ FONKSİYON (İÇİ DOLDURULMUŞ HALİ)
 function handlePlayerDeath(player) {
@@ -1118,10 +1381,30 @@ function handlePlayerDeath(player) {
 
 function spawnInitialMobs() {
   let count = 0;
+  // Normal mobları oluştur
   while (count < 40) {
-    spawnMob("village"); // YENİ: Hangi haritada spawn olacağını belirt
+    spawnMob("village"); 
     count++;
   }
+  
+  // Metin taşlarını oluştur (Harita başına 2-3 adet)
+  // spawnMetin fonksiyonunu doğrudan çağır
+  
+  // Village (Köy) Metinleri
+  spawnMetin("village");
+  spawnMetin("village");
+  spawnMetin("village"); // 3 adet
+
+  // Forest (Orman) Metinleri
+  spawnMetin("forest");
+  spawnMetin("forest"); // 2 adet
+  
+  // Desert (Çöl) Metinleri
+  spawnMetin("desert");
+  spawnMetin("desert"); // 2 adet
+
+  // Ice (Buzul) Metinleri (Opsiyonel, harita level aralığı 61-80)
+  // spawnMetin("ice"); 
 }
 
 // ---------------------- SOCKET BAĞLANTISI ----------------------
@@ -1153,84 +1436,233 @@ io.on("connection", (socket) => {
       const mob = mobs[mobId];
       if (mob.map === player.map && mob.isAlive && distance(player, mob) < ATTACK_RANGE) {
         
+        // YENİ: METİN TAŞI MANTIĞI
+        if (mob.isMetin) {
+            
+            // Eğer spawnCount sıfır veya negatifse (tüm moblar çıktıysa) daha fazla kontrol etme
+            if (mob.spawnCount <= 0) {
+                // ...
+            } else {
+                
+                // KRİTİK EŞİK KONTROLÜ
+                const maxSpawnThreshold = mob.maxHp * (mob.maxSpawnCount / mob.maxSpawnCount); // 500 * 1 = 500
+                const currentSpawnThreshold = mob.maxHp * ((mob.spawnCount - 1) / mob.maxSpawnCount); // Örneğin: 500 * (4/5) = 400
+                
+                // Kontrol: Mevcut can (hp), ilk spawn eşiği mi (500) VE hasar sonrası bir sonraki eşiğin (400) altına mı düşüyor?
+                // VEYA: Mevcut can (hp) bir önceki eşiğin üstünde mi VE hasar sonrası altına mı düşüyor?
+                
+                let shouldSpawn = false;
+
+                // A. İLK VURUŞ KONTROLÜ (Can %100'deyken)
+                if (mob.hp === mob.maxHp && (mob.hp - totalDmg) < mob.maxHp) {
+                    shouldSpawn = true;
+                } 
+                // B. SONRAKİ VURUŞLARDAKİ EŞİK KONTROLÜ
+                else if (mob.hp > currentSpawnThreshold && (mob.hp - totalDmg) <= currentSpawnThreshold) {
+                    shouldSpawn = true;
+                }
+
+                if (shouldSpawn) {
+                    
+                    // Mob çıkar!
+                    const count = Math.floor(Math.random() * (mob.mobSpawnCount[1] - mob.mobSpawnCount[0] + 1)) + mob.mobSpawnCount[0];
+                    
+                    for (let i = 0; i < count; i++) {
+                        // Metin'den çıkacak Mob'un tipi ve seviyesi
+                        const mobTypeToSpawn = mob.spawnMobTypes[Math.floor(Math.random() * mob.spawnMobTypes.length)];
+                        const levelToSpawn = mob.spawnMobLevelRange[0] + Math.floor(Math.random() * (mob.spawnMobLevelRange[1] - mob.spawnMobLevelRange[0] + 1));
+                        
+                        spawnMob(mob.map, {
+                            parentX: mob.x, 
+                            parentY: mob.y, 
+                            forcedType: mobTypeToSpawn, 
+                            forcedLevel: levelToSpawn
+                        });
+                    }
+                    
+                    mob.spawnCount--; // Spawn hakkını 1 azalt (KRİTİK)
+                    
+                    socket.emit("showNotification", {
+                        title: "Metin Taşından Canavar Çıktı!",
+                        message: `${mob.type} içinden yeni canavarlar fırladı! Kalan dalga: ${mob.spawnCount}`
+                    });
+                }
+            }
+            
+        }
+        // METİN TAŞI MANTIĞI SONU
+        
         // CANAVAR HASAR ALDI
         mob.hp -= totalDmg;
         
-        // YENİ: REAKTİF AI TETİKLEMESİ
-        // Canavar hayattaysa VE bir hedefi yoksa, saldırana hedef al
-        if (mob.hp > 0 && !mob.targetId) {
-          mob.targetId = player.id;
-        }
-
-        // CANAVAR ÖLDÜ
-        if (mob.hp <= 0) {
-          mob.isAlive = false;
-          mob.deathTime = Date.now(); // <-- YENİ EKLENEN SATIR
-
-          giveExp(player, mob.exp);
-          
-          // --- YANG DÜŞÜRME BÖLÜMÜ ---
-          // Düşen Yang miktarını belirle (Örn: mob level'ının 50-150 katı)
-          const droppedYang = mob.level * (Math.floor(Math.random() * 101) + 50);
-          player.yang += droppedYang; // Oyuncuya Yang'ı anında ekle
-          
-          socket.emit("showNotification", {
-            title: "Yang Düştü!",
-            message: `${mob.type} canavarından ${droppedYang.toLocaleString()} Yang kazandın.` // toLocaleString eklendi
-          });
-          // --- YANG DÜŞÜRME BÖLÜMÜ SONU ---
-          
-          if (Math.random() < mob.dropRate) {
-            const itemId = mob.drops[Math.floor(Math.random() * mob.drops.length)];
-            const itemTemplate = ITEM_DB[itemId];
-            if (!itemTemplate) continue; // Güvenlik kontrolü
-            
-            const item = { ...itemTemplate }; // Eşyanın kopyasını oluştur
-            console.log(`${player.name} ${mob.type}'dan ${item.name} düşürdü!`);
-            
-            // --- YENİ: EŞYAYI SUNUCUDA ENVANTERE EKLE ---
-            let itemAdded = false;
-
-            // 1. Tüketilebilir (Pot) ise birleştirmeyi (stack) dene
-            if (item.type === 'consumable') {
-                const existingStackIndex = player.inventory.findIndex(i => i && i.id === item.id && i.quantity < 200);
-                if (existingStackIndex !== -1) {
-                    player.inventory[existingStackIndex].quantity = (player.inventory[existingStackIndex].quantity || 1) + 1; // Miktarı 1 artır
-                    itemAdded = true;
-                }
-            }
-            
-            // 2. Birleşmediyse (veya pot değilse), boş slot ara
-            if (!itemAdded) {
-                const index = player.inventory.findIndex(slot => slot === null);
-                if (index > -1) {
-                    // Potlar 1 adet olarak düşer
-                    if (item.type === 'consumable') {
-                        item.quantity = 1; 
-                    }
-                    player.inventory[index] = item;
-                    itemAdded = true;
-                }
-            }
-            // --- SUNUCU EKLEME SONU ---
-
-            // 3. Ekleme başarılı olduysa bildirim gönder
-            if (itemAdded) {
-                socket.emit("showNotification", {
-                    title: "Eşya Düştü!",
-                    message: `${mob.type} canavarından **${item.name}** kazandın.`
-                });
-            } else {
-                // Envanter dolu, client'a "dolu" bildirimi gönder
-                socket.emit("showNotification", {
-                    title: "Envanter Dolu!",
-                    message: `Envanteriniz dolu, ${item.name} yere düştü (ve kayboldu!)`
-                });
-            }
-            
-            // socket.emit("itemDrop", { item }); // <-- ESKİ KOD SİLİNDİ
+        // YENİ: REAKTİF AI TETİKLEMESİ (Sadece normal moblar için)
+        if (!mob.isMetin) { 
+          // Canavar hayattaysa VE bir hedefi yoksa, saldırana hedef al
+          if (mob.hp > 0 && !mob.targetId) {
+            mob.targetId = player.id;
           }
         }
+
+
+        // CANAVAR ÖLDÜ / METİN KIRILDI
+if (mob.hp <= 0) {
+    mob.isAlive = false;
+    mob.deathTime = Date.now(); 
+
+    // --- KRİTİK DÜZELTME: PARTİ EXP PAYLAŞIM MANTIĞI BAŞLANGICI ---
+    // Varsayılan alıcı: Sadece saldıran oyuncu
+    let expRecipients = [player]; 
+
+    if (player.partyId) {
+        const party = parties[player.partyId];
+        if (party) {
+            // 1. Partideki uygun diğer üyeleri bul (Killer hariç)
+            const eligiblePartyMembers = party.members
+                // Killer'ı filtreleme işleminden önce çıkar (Çünkü Killer EXP'yi her zaman alır)
+                .filter(memberId => memberId !== player.id) 
+                .map(memberId => players[memberId])
+                .filter(member => 
+                    member && 
+                    member.map === player.map &&      // Aynı haritada mı?
+                    member.isAlive &&
+                    member.level >= mob.level - 15 &&  // Mob seviyesinden 5 düşük veya üstü
+                    distance(member, mob) < 1600      // <<< GÜNCELLENDİ: Uzaklık 800'den 1200'e çıkarıldı
+                );
+            
+            // 2. Alıcılar listesi: Killer + Uygun Party Üyeleri
+            expRecipients = [player, ...eligiblePartyMembers]; 
+        }
+    }
+    
+    // EXP'yi belirlenen oyunculara dağıt (expRecipients dizisinin boyutuna bölünür)
+    // (Debug logu kullanıcının isteği üzerine eklendi)
+    console.log(`[EXP LOG] Mob EXP: ${mob.exp}. Alıcı Sayısı: ${expRecipients.length}. Kişi Başı EXP: ${Math.floor(mob.exp / expRecipients.length)}`);
+    giveExp(expRecipients, mob.exp); 
+    // --- PARTİ EXP PAYLAŞIM MANTIĞI SONU ---
+          
+          
+          if (mob.isMetin) {
+              // --- METİN DROP VE YANG MANTIĞI ---
+              
+              const droppedYang = mob.level * (Math.floor(Math.random() * 501) + 500); // Daha fazla yang
+              player.yang += droppedYang; 
+              
+              socket.emit("showNotification", {
+                title: "Metin Taşı Kırıldı!",
+                message: `${mob.type} Metin Taşı'nı kırdın! ${droppedYang.toLocaleString()} Yang kazandın.`
+              });
+              
+              // Metin Drop'ları (yüksek seviye potlar)
+              if (Math.random() < mob.dropRate) {
+                  // Büyük kırmızı/mavi pot veya başka bir özel item düşür
+                  const dropId = (Math.random() < 0.5) ? 9003 : 9013; 
+                  const itemTemplate = ITEM_DB[dropId];
+                  
+                  if (itemTemplate) {
+                      const item = { ...itemTemplate, quantity: 1 };
+                      
+                      let itemAdded = false;
+                      
+                      // 1. Tüketilebilir (Pot) ise birleştirmeyi (stack) dene
+                      if (item.type === 'consumable') {
+                          const existingStackIndex = player.inventory.findIndex(i => i && i.id === item.id && (i.quantity || 0) < 200);
+                          if (existingStackIndex !== -1) {
+                              player.inventory[existingStackIndex].quantity = (player.inventory[existingStackIndex].quantity || 1) + 1; 
+                              itemAdded = true;
+                          }
+                      }
+                      
+                      // 2. Birleşmediyse (veya pot değilse), boş slot ara
+                      if (!itemAdded) {
+                          const index = player.inventory.findIndex(slot => slot === null);
+                          if (index > -1) {
+                              if (item.type === 'consumable') {
+                                  item.quantity = 1; 
+                              }
+                              player.inventory[index] = item;
+                              itemAdded = true;
+                          }
+                      }
+
+                      if (itemAdded) {
+                          socket.emit("showNotification", {
+                              title: "Eşya Düştü!",
+                              message: `${mob.type} metninden **${item.name}** kazandın.`
+                          });
+                      } else {
+                          socket.emit("showNotification", {
+                              title: "Envanter Dolu!",
+                              message: `Envanteriniz dolu, ${item.name} yere düştü (ve kayboldu!)`
+                          });
+                      }
+                  }
+              }
+              
+              // KRİTİK: Metinse, onu Respawn listesine ekle ve mob listesinden çıkar
+              deadMetins[mobId] = { 
+                  type: mob.type,
+                  map: mob.map,
+                  respawnTime: Date.now() + METIN_RESPAWN_TIME // 1 dakika sonra
+              };
+              delete mobs[mobId]; 
+
+          } else {
+              // --- NORMAL MOB YANG VE DROP MANTIĞI ---
+
+              const droppedYang = mob.level * (Math.floor(Math.random() * 101) + 50);
+              player.yang += droppedYang; 
+              
+              socket.emit("showNotification", {
+                title: "Yang Düştü!",
+                message: `${mob.type} canavarından ${droppedYang.toLocaleString()} Yang kazandın.` 
+              });
+              
+              // Normal Mob Eşya Düşürme Mantığı
+              if (Math.random() < mob.dropRate) {
+                const itemId = mob.drops[Math.floor(Math.random() * mob.drops.length)];
+                const itemTemplate = ITEM_DB[itemId];
+                if (itemTemplate) { // Güvenlik kontrolü
+                
+                    const item = { ...itemTemplate }; 
+                    let itemAdded = false;
+
+                    // 1. Tüketilebilir (Pot) ise birleştirmeyi (stack) dene
+                    if (item.type === 'consumable') {
+                        const existingStackIndex = player.inventory.findIndex(i => i && i.id === item.id && (i.quantity || 0) < 200);
+                        if (existingStackIndex !== -1) {
+                            player.inventory[existingStackIndex].quantity = (player.inventory[existingStackIndex].quantity || 1) + 1; 
+                            itemAdded = true;
+                        }
+                    }
+                    
+                    // 2. Birleşmediyse (veya pot değilse), boş slot ara
+                    if (!itemAdded) {
+                        const index = player.inventory.findIndex(slot => slot === null);
+                        if (index > -1) {
+                            if (item.type === 'consumable') {
+                                item.quantity = 1; 
+                            }
+                            player.inventory[index] = item;
+                            itemAdded = true;
+                        }
+                    }
+
+                    // 3. Ekleme başarılı olduysa bildirim gönder
+                    if (itemAdded) {
+                        socket.emit("showNotification", {
+                            title: "Eşya Düştü!",
+                            message: `${mob.type} canavarından **${item.name}** kazandın.`
+                        });
+                    } else {
+                        socket.emit("showNotification", {
+                            title: "Envanter Dolu!",
+                            message: `Envanteriniz dolu, ${item.name} yere düştü (ve kayboldu!)`
+                        });
+                    }
+                }
+              }
+          }
+        } // if (mob.hp <= 0) sonu
       }
     }
   });
@@ -1648,23 +2080,37 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
   socket.on("sellItem", ({ itemId, inventoryIndex }) => {
       const player = players[socket.id];
       const itemData = ITEM_DB[itemId];
+      const itemInSlot = player.inventory[inventoryIndex]; // Slot'taki gerçek item
 
       if (!player || !itemData || !itemData.sellPrice) return;
-
-      const sellPrice = itemData.sellPrice;
       
-      // Yang'ı ekle
-      player.yang += sellPrice;
+      // KRİTİK KONTROL: Satılmak istenen item, slotta beklenen item mi? (Güvenlik)
+      if (!itemInSlot || itemInSlot.id !== itemId) {
+          // Eğer slot boşsa veya itemler uyuşmuyorsa
+          return socket.emit("showNotification", { title: "Hata", message: "Satılmak istenen eşya envanterde bulunamadı." });
+      }
 
-      // Client'a envanterden silmesi için sinyal gönder
+      // Potlar için miktar kontrolü
+      const quantity = itemInSlot.quantity || 1;
+      const totalSellPrice = itemData.sellPrice * quantity; // Miktara göre toplam fiyat
+
+      // 1. Yang'ı ekle
+      player.yang += totalSellPrice;
+
+      // 2. KRİTİK: Sunucu envanterinden sil
+      player.inventory[inventoryIndex] = null; // Eşyayı kalıcı olarak sil
+
+      // 3. Client'a envanterden silmesi için sinyal gönder
       socket.emit("itemSold", { 
           inventoryIndex: inventoryIndex
       });
 
       socket.emit("showNotification", { 
           title: "Satıldı", 
-          message: `**${itemData.name}** eşyasını ${sellPrice.toLocaleString()} Yang karşılığında sattın.` 
+          message: `**${itemData.name}** (x${quantity}) eşyasını ${totalSellPrice.toLocaleString()} Yang karşılığında sattın.` 
       });
+      
+      // Oyuncunun statüleri değişmediği için recalculate ve savePlayer çağırmaya gerek yok.
   });
 
   
@@ -1745,6 +2191,7 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
   });
 
   // --- YENİ EKLENDİ (SOHBET) ---
+  // --- GÜNCELLENDİ: TÜM SOHBET MANTIKLARI ---
   socket.on("sendChatMessage", (data) => {
       const player = players[socket.id];
       if (!player) return;
@@ -1754,14 +2201,10 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
           return;
       }
 
-      // =================================================================
-      // ### YENİ FISILTI (WHISPER) MANTIĞI ###
-      // =================================================================
-      
-      // 1. Mesaj /w ile mi başlıyor?
+      // 1. /w (WHISPER) MANTIĞI
       if (message.startsWith("/w ") || message.startsWith("/W ")) {
           const parts = message.split(" ");
-          if (parts.length < 3) { // Eğer "/w OyuncuAdı" yazıp mesaj yazmadıysa
+          if (parts.length < 3) {
               socket.emit("newChatMessage", {
                   type: 'error',
                   message: `Kullanım: /w <OyuncuAdı> <Mesajınız>`
@@ -1772,12 +2215,10 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
           const targetName = parts[1];
           const whisperMessage = parts.slice(2).join(" ");
 
-          // 2. Hedef oyuncuyu bul (Büyük/küçük harf duyarsız)
           const targetPlayer = Object.values(players).find(
               p => p.name.toLowerCase() === targetName.toLowerCase()
           );
 
-          // 3. Kontroller
           if (!targetPlayer) {
               socket.emit("newChatMessage", {
                   type: 'error',
@@ -1794,26 +2235,47 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
               return;
           }
 
-          // 4. Fısıltıyı Gönder
           console.log(`[Fısıltı] ${player.name} -> ${targetPlayer.name}: ${whisperMessage}`);
           
-          // 4a. Mesajı HEDEFE gönder
           io.to(targetPlayer.id).emit("newChatMessage", {
               type: 'whisper_received',
               sender: player.name,
               message: whisperMessage
           });
           
-          // 4b. Mesajın GÖNDERİLDİĞİNİ GÖNDERENE bildir
           socket.emit("newChatMessage", {
               type: 'whisper_sent',
               target: targetPlayer.name,
               message: whisperMessage
           });
 
+      // 2. /p (PARTY CHAT) MANTIĞI (YENİ EKLENDİ)
+      } else if (message.startsWith("/p ") || message.startsWith("/P ")) {
+          if (!player.partyId || !parties[player.partyId]) {
+               socket.emit("newChatMessage", {
+                  type: 'error',
+                  message: `Parti sohbeti için bir partide olmalısın. (Komut: /p <Mesajınız>)`
+              });
+              return;
+          }
+
+          const partyMessage = message.substring(3).trim(); // "/p " kısmını atla
+          if (partyMessage.length === 0) return;
+
+          const party = parties[player.partyId];
+          console.log(`[Parti Sohbeti] ${player.name}: ${partyMessage}`);
+          
+          // Partideki tüm üyelere gönder
+          party.members.forEach(memberId => {
+              io.to(memberId).emit("newChatMessage", {
+                  type: 'party',
+                  sender: player.name,
+                  message: partyMessage
+              });
+          });
+
       } else {
-          // --- ESKİ GENEL SOHBET MANTIĞI ---
-          // Mesaj /w ile başlamıyorsa, genel sohbete gönder
+          // 3. GENEL SOHBET MANTIĞI
           console.log(`[Genel Sohbet] ${player.name}: ${message}`);
           io.emit("newChatMessage", {
               type: 'general',
@@ -1821,9 +2283,6 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
               message: message
           });
       }
-      // =================================================================
-      // ### YENİ MANTIK SONU ###
-      // =================================================================
   });
 
   socket.on("attemptUpgrade", ({ inventoryIndex }) => {
@@ -1915,22 +2374,6 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
     socket.emit("registerSuccess");
 });
 
-// Önce bir yardımcı fonksiyon ekleyelim
-  function sendPartyUpdate(partyId) {
-      const party = parties[partyId];
-      if (!party) return;
-
-      // Partideki herkesin en güncel verisini (HP, MP vb.)
-      // göndermek yerine, sadece parti YAPISINI gönderiyoruz.
-      // Client, bu yapıya göre kendi 'players' objesinden verileri çekecek.
-      
-      // Partideki herkese güncel listeyi gönder
-      party.members.forEach(memberId => {
-          if (players[memberId]) { // Oyuncu hala oyundaysa
-              io.to(memberId).emit("partyDataUpdate", party);
-          }
-      });
-  }
 
   socket.on("inviteToParty", (targetPlayerId) => {
       const inviter = players[socket.id];
@@ -2239,14 +2682,14 @@ function executeTrade(tradeId) {
             return cancelTrade(tradeId, "Oyunculardan biri çevrimdışı.");
         }
 
-        // --- 1. SON DOĞRULAMA (HACK KONTROLÜ) ---
+        // --- 1. SON DOĞRULAMA ---
         
         // Yang Kontrolü
         if (playerA.yang < trade.playerA_offer.yang || playerB.yang < trade.playerB_offer.yang) {
             return cancelTrade(tradeId, "Yetersiz Yang nedeniyle ticaret iptal edildi.");
         }
         
-        // Eşya Varlığı Kontrolü
+        // Eşya Varlığı Kontrolü 
         const itemsA = [];
         for (const offer of trade.playerA_offer.items) {
             const item = playerA.inventory[offer.invIndex];
@@ -2298,13 +2741,27 @@ function executeTrade(tradeId) {
         addItemsToInventory(playerA, itemsB);
         addItemsToInventory(playerB, itemsA);
 
-        // --- 3. BİTİŞ ---
-        console.log(`Ticaret ${tradeId} başarıyla tamamlandı.`);
+        // --- 3. BİTİŞ VE KRİTİK SİNYALLER (GÜNCELLENEN KISIM) ---
+        console.log(`Ticaret ${tradeId} başarıyla tamamlandı. Sinyaller gönderiliyor.`);
         
-        // KRİTİK SİNYALLER:
-        // Her iki tarafa da BAŞARI sinyali gönder
-        io.to(playerA.id).emit("tradeSuccess", { message: "Ticaret başarıyla tamamlandı!" });
-        io.to(playerB.id).emit("tradeSuccess", { message: "Ticaret başarıyla tamamlandı!" });
+        // KRİTİK SİNYALLER: Güncel Envanter ve Yang'ı GÖNDER
+        // Client'ın ekranı KAPATMASI ve envanterini senkronize etmesi için bu veriler zorunludur.
+        
+        // Player A'ya sinyal
+        io.to(playerA.id).emit("tradeSuccess", { 
+            message: "Ticaret başarıyla tamamlandı!",
+            inventory: playerA.inventory, 
+            yang: playerA.yang            
+        });
+
+        // Player B'ye sinyal
+        io.to(playerB.id).emit("tradeSuccess", { 
+            message: "Ticaret başarıyla tamamlandı!",
+            inventory: playerB.inventory, 
+            yang: playerB.yang            
+        });
+        
+        // --- 4. TİCARET OTURUMUNU TEMİZLE (Sinyal gönderildikten sonra!) ---
         
         // Oyuncuları kaydet
         savePlayer(playerA);
@@ -2315,12 +2772,10 @@ function executeTrade(tradeId) {
         playerB.tradeId = null;
         delete activeTrades[tradeId];
         
-        // Eğer bu noktaya ulaşırsak fonksiyonu sonlandırırız.
         return; 
         
     } catch (error) {
         console.error("!!! Ticaret YÜRÜTÜLÜRKEN KRİTİK HATA:", error);
-        // Hata oluşursa ticareti güvenli bir şekilde iptal et
         cancelTrade(tradeId, "Bilinmeyen bir sunucu hatası nedeniyle ticaret iptal edildi.");
     }
 }
@@ -2665,9 +3120,74 @@ socket.on("confirmTrade", ({ tradeId }) => {
 });
 });
 
+function distance(a, b) {
+  const dx = a.x + a.width / 2 - (b.x + b.width / 2);
+  const dy = a.y + a.height / 2 - (b.y + b.height / 2);
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// --- GÜNCEL SENDPARTYUPDATE FONKSİYONU BAŞLANGICI ---
+function sendPartyUpdate(partyId) {
+    const party = parties[partyId];
+    if (!party) return;
+
+    const memberDetails = party.members.map(memberId => {
+        const member = players[memberId];
+        if (!member) return null;
+        return {
+            id: member.id,
+            name: member.name,
+            hp: member.hp,
+            maxHp: member.maxHp,
+            level: member.level
+        };
+    }).filter(Boolean);
+
+    const partyDataToSend = {
+        id: party.id,
+        leader: party.leader,
+        members: party.members,
+        memberDetails: memberDetails
+    };
+
+    party.members.forEach(memberId => {
+        if (players[memberId]) { 
+            io.to(memberId).emit("partyDataUpdate", partyDataToSend);
+        }
+    });
+}
+// --- GÜNCEL SENDPARTYUPDATE FONKSİYONU SONU ---
+
 // ---------------------- SUNUCU OYUN DÖNGÜSÜ ----------------------
 function serverGameLoop() {
   const now = Date.now(); // 'now' değişkenini döngünün başına taşıdık
+
+  // --- YENİ EKLENEN PARTİ DURUM GÜNCELLEMESİ ---
+  const partyUpdateInterval = 500; // 500ms'de bir (0.5 saniye)
+  if (now % partyUpdateInterval < 50) { // Her 500ms'de bir tetiklenir
+      for (const partyId in parties) {
+          sendPartyUpdate(partyId); // Her parti için güncel durumu yolla
+      }
+  }
+  // --- PARTİ DURUM GÜNCELLEMESİ SONU ---
+
+  // --- YENİ: METİN RESPAWN KONTROLÜ (1 DAKİKA) ---
+    const metinsToSpawn = [];
+    for (const metinId in deadMetins) {
+        const deadMetin = deadMetins[metinId];
+        if (now >= deadMetin.respawnTime) {
+            // Respawn zamanı geldi
+            metinsToSpawn.push({ id: metinId, map: deadMetin.map });
+        }
+    }
+
+    metinsToSpawn.forEach(({ id, map }) => {
+        // Metin yarat (Rastgele bir konumda)
+        spawnMetin(map); 
+        // Respawn listesinden çıkar
+        delete deadMetins[id];
+    });
+    // --- METİN RESPAWN KONTROLÜ SONU ---
 
   // 1. Oyuncu Mantığı
   for (const socketId in players) {
@@ -2785,6 +3305,8 @@ function serverGameLoop() {
     
     // 2d. HEDEF YOKSA: Yeni hedef ara (Aggressive AI) veya Leash (Eve Dön)
     if (!targetPlayer) {
+        
+      // 1. Saldırgan moblar için hedef ara... (Bu kısım aynı kalır)
       if (mob.isAggressive) {
         let closestDist = mob.aggroRange;
         let potentialTarget = null;
@@ -2806,17 +3328,69 @@ function serverGameLoop() {
         }
       }
       
+      // 2. Mobun gezinme/eve dönme mantığı (Roaming)
       if (!mob.targetId) {
         const distToSpawn = Math.hypot(mob.x - mob.spawnX, mob.y - mob.spawnY);
-        if (distToSpawn > 5) { 
-          const angle = Math.atan2(mob.spawnY - mob.y, mob.spawnX - mob.x);
-          mob.x += Math.cos(angle) * mob.moveSpeed * 0.5; 
-          mob.y += Math.sin(angle) * mob.moveSpeed * 0.5; 
+        const maxRoamingRange = 400; // Mob, spawn noktasından en fazla 400 birim uzaklaşabilir
+
+        // KRİTİK: Mob bekleme durumunda mı?
+        if (mob.roamWaitTime && now < mob.roamWaitTime) {
+            mob.animState = "idle"; // Bekliyorsa idle animasyonu
+            continue; // Hareket etme kodunu atla
         }
-        continue; 
+
+
+        if (distToSpawn > maxRoamingRange) { 
+          // Ana spawn noktasına geri dön (Leash)
+          const angle = Math.atan2(mob.spawnY - mob.y, mob.spawnX - mob.x);
+          mob.x += Math.cos(angle) * mob.moveSpeed * 0.5; // Yavaşça eve dön
+          mob.y += Math.sin(angle) * mob.moveSpeed * 0.5; 
+          
+          mob.animState = "walk"; // Geri dönerken yürüme animasyonu
+          mob.roamWaitTime = null; // Geri dönerken bekleme olmaz
+        } else {
+          // Gezinme (Roaming)
+          
+          // Mob roam hedefine ulaştı mı? (roamTargetX henüz tanımlı değilse ilk hedefini belirlemesi için)
+          const reachedTarget = mob.roamTargetX === undefined || Math.hypot(mob.x - mob.roamTargetX, mob.y - mob.roamTargetY) < 10;
+
+          if (reachedTarget) {
+              // Hedefe ulaştıysa veya ilk kez başlıyorsa: Dur ve bekleme süresi ata
+              
+              // YENİ HEDEFİ BELİRLE
+              let newTargetX, newTargetY;
+              do {
+                  newTargetX = mob.spawnX + (Math.random() * maxRoamingRange * 2) - maxRoamingRange;
+                  newTargetY = mob.spawnY + (Math.random() * maxRoamingRange * 2) - maxRoamingRange;
+              } while (Math.hypot(newTargetX - mob.spawnX, newTargetY - mob.spawnY) > maxRoamingRange);
+              
+              mob.roamTargetX = newTargetX;
+              mob.roamTargetY = newTargetY;
+              
+              // BEKLEME SÜRESİ EKLE (1 ila 3 saniye)
+              mob.animState = "idle"; // Durduğu için idle animasyonu
+              const pauseDuration = 1000 + Math.random() * 2000; 
+              mob.roamWaitTime = now + pauseDuration; 
+              
+          } else {
+              // Hedefe doğru yürü
+              mob.animState = "walk"; // <<< YÜRÜYORSA WALK ANİMASYONU
+              
+              const angle = Math.atan2(mob.roamTargetY - mob.y, mob.roamTargetX - mob.x);
+              mob.x += Math.cos(angle) * mob.moveSpeed * 0.25; 
+              mob.y += Math.sin(angle) * mob.moveSpeed * 0.25;
+              
+              // Yönü güncelle (animasyon için)
+              if (angle >= -Math.PI / 4 && angle <= Math.PI / 4) mob.direction = "right";
+              else if (angle > Math.PI / 4 && angle <= 3 * Math.PI / 4) mob.direction = "down";
+              else if (angle < -Math.PI / 4 && angle >= -3 * Math.PI / 4) mob.direction = "up";
+              else mob.direction = "left";
+          }
+        }
+        continue; // Hedef yoksa, saldırma/takip etme kodunu atla
       }
     }
-
+    
     // 2e. HEDEF VARSA: Takip et ve Saldır
     if (targetPlayer) {
       const dist = distance(mob, targetPlayer);
@@ -2825,10 +3399,12 @@ function serverGameLoop() {
 
       if (dist > mob.aggroRange * 1.5 || distToSpawn > leashRange) {
         mob.targetId = null;
+        mob.animState = "idle"; // <<< Hedefini kaybetti, idle başlasın
         continue; 
       }
 
       if (dist <= mob.attackRange) {
+        mob.animState = "attack"; // <<< Mob saldırı menzilinde: attack animasyonu
         if (now - mob.lastAttack > mob.attackSpeed) {
           mob.lastAttack = now;
           targetPlayer.hp -= mob.dmg;
@@ -2839,6 +3415,8 @@ function serverGameLoop() {
           }
         }
       } else {
+        // Hedefe doğru yürüyor
+        mob.animState = "walk"; // <<< Mob hedefe doğru yürüyor: walk animasyonu
         const angle = Math.atan2(targetPlayer.y - mob.y, targetPlayer.x - mob.x);
         mob.x += Math.cos(angle) * mob.moveSpeed;
         mob.y += Math.sin(angle) * mob.moveSpeed;
@@ -2852,23 +3430,41 @@ function serverGameLoop() {
     }
   } // for(mobs) sonu
 
-  // 2f. Mob Sayısını Doldur (Harita Başına)
+//2f. Mob Sayısını Doldur (Harita Başına)
   const mobCountByMap = {};
+  const metinCountByMap = {}; 
     for (const mapName in MAP_DATA) {
         mobCountByMap[mapName] = 0;
+        metinCountByMap[mapName] = 0; 
     }
     
     for (const mobId in mobs) {
-        if (mobs[mobId].map && mobCountByMap[mobs[mobId].map] !== undefined) {
-            mobCountByMap[mobs[mobId].map]++;
+        if (mobs[mobId].map && mobCountByMap[mobs[mobId].map] !== undefined && mobs[mobId].isAlive) { // Sadece CANLI mobları say
+            if (mobs[mobId].isMetin) {
+                 metinCountByMap[mobs[mobId].map]++; 
+            } else {
+                 mobCountByMap[mobs[mobId].map]++; 
+            }
         }
     }
 
-    const MAX_MOBS_PER_MAP = 100; // Harita başına maksimum mob sayısı (Toplam 200 mob)
+    const MAX_MOBS_PER_MAP = 100;
+    const MAX_METINS_PER_MAP = 3; 
     
     for (const mapName in mobCountByMap) {
+        // Normal mobları doldur
         if (mobCountByMap[mapName] < MAX_MOBS_PER_MAP) {
-            spawnMob(mapName); // YENİ: Eksik olan haritaya mob spawnla
+            // Eksik mob sayısı kadar deneme yap
+            for(let i = 0; i < MAX_MOBS_PER_MAP - mobCountByMap[mapName]; i++) {
+                 spawnMob(mapName);
+            }
+        }
+        
+        // Metinleri doldur (Max 3)
+        if (metinCountByMap[mapName] < MAX_METINS_PER_MAP) {
+             for(let i = 0; i < MAX_METINS_PER_MAP - metinCountByMap[mapName]; i++) {
+                 spawnMetin(mapName); 
+            }
         }
     }
 

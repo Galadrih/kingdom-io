@@ -1,1814 +1,1129 @@
-/* --- GENEL STİL ve FONT --- */
+/* =========================================================
+   ASHEN REALMS - DARK FANTASY UI (TAM & DÜZELTİLMİŞ)
+   ========================================================= */
+
+/* ========== GENEL RESET & TEMEL ========== */
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    /* Diablo ve Metin2'den ilham alan, okunaklı ama kalın font */
-    font-family: 'Times New Roman', Times, serif, Tahoma, 'Segoe UI', Arial, sans-serif;
     user-select: none;
+    font-family: 'Cinzel', 'Trajan Pro', 'Times New Roman', serif;
 }
 
 body {
-    /* GELİŞTİRİLDİ: Arkaplana Hafif Bir Dokusal Efekt */
-    background: #0d0d0d url('/assets/dark_texture.png') repeat; /* Hafif bir taş/metal dokusu */
-    color: #f0e6d2; /* Hafif kirli beyaz */
-    overflow: hidden;
+    background: radial-gradient(circle at center, #050505 55%, #000 100%);
+    color: #d8d8d8;
     height: 100vh;
-    margin: 0;
-    cursor: url('/assets/cursor.png'), auto; /* Özel imleç (opsiyonel) */
-    /* GELİŞTİRİLDİ: Font rendering iyileştirmesi */
+    overflow: hidden;
+    cursor: url('/assets/cursor.png'), auto;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-}
-
-h1, h3 {
-    color: #FFD700; /* Klasik Metin2 Altın */
-    /* GELİŞTİRİLDİ: Daha keskin ve katmanlı gölge */
-    text-shadow: 2px 2px 0px #000, 
-                 -1px -1px 0px #000, 
-                 0 0 15px rgba(255, 215, 0, 0.6);
-}
-
-button {
-    cursor: url('/assets/pointer.png'), pointer; /* Özel buton imleci (opsiyonel) */
-    /* GELİŞTİRİLDİ: Genel 3D görünüm */
-    border: none;
-    outline: none;
-    box-shadow: 0 4px 0 #888, 0 0 10px rgba(0,0,0,0.5); 
-    transition: all 0.1s ease-out;
-}
-button:active {
-    /* GELİŞTİRİLDİ: Basılma hissi */
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 #888, 0 0 5px rgba(0,0,0,0.5);
+    position: relative;
 }
 
 .hidden {
-    display: none !important; /* <<< KRİTİK DÜZELTME: Kapanmayı Garanti Eder */
+    display: none !important;
 }
 
-/* --- OYUN ANA UI VE STATÜ BARLARI (Sol Üst) --- */
-#gameUI {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+/* Hafif kırmızı aura */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(255,0,0,0.04), transparent 70%);
     pointer-events: none;
-    z-index: 10;
+    mix-blend-mode: screen;
+    animation: pulseAura 9s infinite ease-in-out;
+    z-index: 0;
 }
-
-#playerStats {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    /* GELİŞTİRİLDİ: Gradient çerçeve ve desenli arkaplan */
-    background: rgba(10, 10, 10, 0.95) url('/assets/ui_pattern_small.png') repeat;
-    border: 4px solid #6b471c; /* Kalın çerçeve */
-    border-image: linear-gradient(to bottom, #DAA520, #6b471c) 1; 
-    border-width: 4px;
-    border-radius: 8px;
-    padding: 15px 12px;
-    min-width: 200px;
-    pointer-events: auto;
-    box-shadow: 0 0 20px rgba(0,0,0,0.9), inset 0 0 10px rgba(255, 215, 0, 0.1);
-}
-
-.stat-row {
-    margin-bottom: 8px;
-    display: flex;
-    flex-direction: column;
-}
-
-.stat-label {
-    color: #ffd700;
-    font-size: 14px;
-    font-weight: bold;
-    display: block;
-    text-shadow: 1px 1px 2px #000;
-}
-
-.stat-value {
-    color: #FFFFFF;
-    font-size: 17px;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px #000;
-}
-
-/* BARLAR İÇİN GÖRKEMLİ EFEKTLER */
-.hp-bar, .mp-bar, .exp-bar {
-    width: 170px; 
-    height: 18px; /* Daha kalın bar */
-    background: #111;
-    border: 1px solid #333;
-    border-radius: 9px;
-    overflow: hidden;
-    margin-top: 4px;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
-}
-
-.bar-fill {
-    height: 100%;
-    /* GELİŞTİRİLDİ: Daha etkili geçiş */
-    transition: width 0.6s cubic-bezier(0.25, 1, 0.5, 1); 
-    border-radius: 9px;
-    position: relative;
-    overflow: hidden;
-}
-
-/* GELİŞTİRİLDİ: Parlaklık Animasyonu */
-.bar-fill::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.1);
-    animation: bar-shine 5s infinite; 
-}
-@keyframes bar-shine {
-    0%, 100% { background: rgba(255, 255, 255, 0.1); }
-    50% { background: rgba(255, 255, 255, 0.2); }
-}
-
-.hp-bar .bar-fill {
-    /* GELİŞTİRİLDİ: Daha güçlü kırmızı */
-    background: linear-gradient(90deg, #b00000, #ff2222); 
-    box-shadow: 0 0 10px rgba(255,0,0,0.8);
-    filter: drop-shadow(0 0 5px red); 
-}
-
-.mp-bar .bar-fill {
-    /* GELİŞTİRİLDİ: Daha güçlü mavi */
-    background: linear-gradient(90deg, #003366, #0099ff);
-    box-shadow: 0 0 10px rgba(0,150,255,0.8);
-    filter: drop-shadow(0 0 5px blue); 
-}
-
-.exp-bar {
-    height: 10px;
-    border-radius: 5px;
-}
-
-.exp-bar .bar-fill {
-    /* GELİŞTİRİLDİ: Daha doygun yeşil */
-    background: linear-gradient(90deg, #008000, #00cc00);
-    box-shadow: 0 0 8px rgba(0,200,0,0.8);
-    filter: drop-shadow(0 0 4px limegreen);
-}
-
-.stat-text, .exp-text {
-    position: absolute;
-    color: #FFFFFF;
-    font-size: 13px;
-    font-weight: bold;
-    /* GELİŞTİRİLDİ: Daha iyi okunurluk */
-    text-shadow: 0 0 2px #000, 0 0 5px #000;
-    margin-top: -16px; 
-    width: 170px;
-    text-align: center;
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 50% 80%, rgba(255,0,0,0.04), transparent 80%);
     pointer-events: none;
+    z-index: 0;
 }
 
-.exp-text {
-    color: #e6ac00;
-    margin-top: -8px; 
-    font-size: 10px;
+@keyframes pulseAura {
+    0%,100% { opacity: 0.25; }
+    50% { opacity: 0.6; }
 }
 
-/* --- AKSİYON ÇUBUĞU (Hotkeys - Alt Orta) --- */
-#actionBar {
-    position: absolute;
-    bottom: 20px; 
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 8px; 
-    pointer-events: auto;
-    z-index: 20; 
-    padding: 12px 18px;
-    /* GELİŞTİRİLDİ: Daha güçlü çerçeve ve gölge */
-    background: rgba(10, 10, 10, 0.9); 
-    border: 4px solid #DAA520; 
-    border-image: linear-gradient(to right, #6b471c, #DAA520, #6b471c) 1;
-    border-width: 4px;
-    border-radius: 12px;
-    box-shadow: 0 0 25px rgba(255, 215, 0, 0.6);
+/* Başlıklar */
+h1, h2, h3, h4 {
+    color: #c92020;
+    text-shadow: 0 0 8px rgba(201,32,32,0.9), 0 0 16px rgba(80,0,0,0.9);
+    letter-spacing: 1px;
 }
 
-.action-slot {
-    position: relative;
-    width: 52px; 
-    height: 52px;
-    /* GELİŞTİRİLDİ: Daha belirgin 3D/oyuk görünüm */
-    border: 3px solid #555;
-    background: radial-gradient(circle at center, #2a2a2a 0%, #1a1a1a 100%);
-    border-radius: 6px; 
-    cursor: pointer;
-    overflow: hidden; 
-    display: flex; 
-    justify-content: center;
-    align-items: center;
-    transition: all 0.2s;
-    box-shadow: inset 0 0 8px rgba(0,0,0,1.5), 0 4px 6px rgba(0,0,0,0.5);
-}
-
-.action-slot:hover {
-    /* GELİŞTİRİLDİ: Daha sıcak turuncu hover */
-    border-color: #ffaa00; 
-    box-shadow: 0 0 15px rgba(255, 170, 0, 0.9), inset 0 0 5px #ffaa00;
-    transform: translateY(-2px);
-}
-
-.action-slot.active {
-    /* GELİŞTİRİLDİ: Daha belirgin yeşil ve basılma hissi */
-    border-color: #55ff55; 
-    box-shadow: 0 0 15px rgba(85, 255, 85, 0.9), inset 0 0 8px #55ff55;
-    transform: scale(0.98); 
-}
-
-.hotkey-label {
-    position: absolute;
-    bottom: 0px;
-    right: 0px;
-    background: #a02a00; 
-    color: #fff;
-    font-size: 11px;
-    font-weight: bold;
-    padding: 0 5px;
-    border-radius: 6px 0 6px 0;
-    z-index: 15;
-    min-width: 18px;
-    text-align: center;
-    border-left: 1px solid #ff5500;
-    border-top: 1px solid #ff5500;
-}
-
-.cooldown-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    /* GELİŞTİRİLDİ: Dikey dolum için height kullanılır */
-    height: 0%; /* JS tarafından yönetilecek */
-    background-color: rgba(0, 0, 0, 0.9);
-    color: white;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 18px;
-    font-weight: bold;
-    text-shadow: 0 0 5px red;
-    z-index: 10;
-    pointer-events: none;
-    border-radius: 6px; 
-    clip-path: none; /* Artık clip-path kullanılmaz */
-    transition: height 0.1s linear, background-color 0.3s;
-    flex-direction: column-reverse; /* Alttan dolum için */
-    color: #ffaa00; 
-}
-
-/* GELİŞTİRİLDİ: Cooldown bitişi parıltısı */
-.cooldown-overlay.finished {
-    background: rgba(255, 255, 255, 0.2);
-    animation: cooldown-flash 0.3s ease-out;
-}
-@keyframes cooldown-flash {
-    0% { opacity: 1; }
-    100% { opacity: 0; }
-}
-
-/* --- SAĞ ALT PANEL VE ENVANTER BUTONU --- */
-#rightPanel {
-    position: absolute;
-    bottom: 30px;
-    right: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    pointer-events: auto;
-}
-
-.panel-btn {
-    width: 55px;
-    height: 55px;
-    background: linear-gradient(145deg, #2c2c2c, #1a1a1a);
-    border: 3px solid #c89b3c; 
-    border-radius: 10px;
-    color: #FFD700;
-    font-size: 24px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    align-self: flex-end;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5), inset 0 0 8px rgba(255, 215, 0, 0.2);
-}
-
-.panel-btn:hover {
-    background: linear-gradient(145deg, #3c3c3c, #2a2a2a);
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), inset 0 0 10px #FFD700;
-    transform: scale(1.05);
-}
-
-.mini-map {
-    border: 3px solid #6b471c; 
-    border-radius: 12px;
-    box-shadow: 0 0 15px rgba(0,0,0,0.8);
-}
-
-/* --- ENVANTER PANELİ (YENİ GÖRÜNÜM) --- */
-.inventory-panel {
-    position: absolute;
-    bottom: 90px;
-    right: 70px;
-    width: 680px; 
-    height: 540px; 
-    /* GELİŞTİRİLDİ: Daha derin ve görkemli bir çerçeve ve arkaplan */
-    background: linear-gradient(135deg, #1f1f1f, #0f0f0f);
-    border: 5px solid #FFD700;
-    border-image: linear-gradient(135deg, #FFD700, #DAA520, #9C7836) 1;
-    border-width: 5px;
-    border-radius: 18px;
-    box-shadow: 0 0 40px rgba(255, 215, 0, 0.9), inset 0 0 20px rgba(255, 215, 0, 0.4);
-    padding: 20px;
-    z-index: 1000;
-    pointer-events: auto;
-    
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.inventory-content-wrapper {
-    display: flex;
-    flex-direction: row;
-    width: 100%;
-    height: auto;
-    gap: 20px; 
-}
-
-/* KARAKTER BÖLÜMÜ (Ekipman Slotları İçin Konum Düzenlemesi) */
-.character-section {
-    position: relative;
-    width: 250px;
-    height: 440px; 
-    /* GELİŞTİRİLDİ: Parşömen arkaplan */
-    background: rgba(15, 15, 15, 0.9) url('/assets/parchment_bg.png') center/cover;
-    border: 3px solid #6b471c;
-    border-radius: 15px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 0 0 20px rgba(0,0,0,1), inset 0 0 15px rgba(0,0,0,1.2);
-    flex-shrink: 0;
-}
-
-.character-silhouette {
-    width: 160px;
-    height: 360px;
-    background: url('/assets/silhouette.png') center/contain no-repeat;
-    opacity: 0.7;
-    /* GELİŞTİRİLDİ: Parlaklık ve derinlik */
-    filter: drop-shadow(0 0 20px #FFD700) brightness(1.2);
-    position: absolute; 
-}
-
-/* EKİPMAN SLOTLARI (Daha düzenli ve büyük) */
-.equip-slot {
-    position: absolute;
-    width: 64px; 
-    height: 64px;
-    /* GELİŞTİRİLDİ: Daha belirgin 3D/oyuk görünüm */
-    background: radial-gradient(circle at center, #303030 0%, #181818 100%);
-    border: 3px solid #555; 
-    border-radius: 10px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.5, 1);
-    box-shadow: inset 0 0 10px rgba(0,0,0,1.5);
-    z-index: 5; 
-}
-
-.equip-slot:hover {
-    /* GELİŞTİRİLDİ: Daha güçlü hover */
-    border-color: #ffaa00;
-    transform: scale(1.1) rotate(0deg); 
-    box-shadow: 0 0 20px rgba(255, 170, 0, 0.9), inset 0 0 8px #ffaa00;
-    z-index: 10;
-}
-
-.equip-slot.equipped {
-    border-color: #33ff33; 
-    background: rgba(51, 255, 51, 0.1);
-    box-shadow: 0 0 10px rgba(51, 255, 51, 0.4);
-}
-
-/* SLOT POZİSYONLARI - Panelin içine sığacak şekilde ayarlandı */
-[data-type="helmet"]   { top: 20px;  left: 93px; }
-[data-type="armor"]    { top: 100px; left: 93px; }
-[data-type="weapon"]   { top: 180px;  left: 30px; }
-[data-type="shield"]   { top: 180px; left: 156px; }
-[data-type="necklace"] { top: 260px; left: 93px; }
-[data-type="earring"]  { top: 340px; left: 30px; }
-[data-type="bracelet"] { top: 340px; left: 156px; }
-[data-type="shoes"]    { top: 410px; left: 93px; }
-
-/* ENVANTER IZGARASI (5x6 = 30 slot) */
-#inventoryGrid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 8px; 
-    width: 400px; 
-    height: 480px; 
-    padding: 10px;
-    background: rgba(10, 10, 10, 0.8);
-    border: 2px solid #6b471c;
-    border-radius: 15px;
-    box-shadow: inset 0 0 20px rgba(0,0,0,1);
-}
-
-/* Envanter Slotu */
-.inv-slot {
-    position: relative;
-    width: 72px; 
-    height: 72px;
-    /* GELİŞTİRİLDİ: Daha belirgin 3D/oyuk görünüm */
-    background: radial-gradient(circle at center, #303030 0%, #181818 100%);
-    border: 3px solid #555;
-    border-radius: 10px;
-    box-shadow: inset 0 0 10px rgba(0,0,0,1.5);
-    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.5, 1);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.inv-slot:hover {
-    /* GELİŞTİRİLDİ: Daha güçlü hover */
-    border-color: #FFD700;
-    box-shadow: 0 0 20px rgba(255,215,0,1), inset 0 0 8px #FFD700;
-    transform: scale(1.08) translateY(-2px);
-    z-index: 10;
-}
-
-.inv-slot img, .equip-slot img {
-    width: 90%; 
-    height: 90%; 
-    object-fit: contain;
-    pointer-events: none;
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb {
+    background: #440000;
     border-radius: 4px;
 }
+::-webkit-scrollbar-thumb:hover { background: #770000; }
 
-/* YIĞIN MİKTARI GÖSTERGESİ (Stack Counter) */
-.item-quantity {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    /* GELİŞTİRİLDİ: Daha net ve köşeli sayaç */
-    background: #440000;
-    color: #ffaa00;
-    font-size: 12px;
-    font-weight: bold;
-    padding: 2px 5px;
-    border-radius: 4px 0 6px 0;
-    line-height: 1;
-    z-index: 5;
-    min-width: 15px;
-    text-align: center;
-    border: 2px solid #ffaa00;
-    text-shadow: 0 0 5px #000;
-}
+/* ========== GENEL PANEL & BUTON STİLLERİ ========== */
 
-/* YANG GÖSTERGESİ (Footer) */
-.inventory-yang-display {
-    width: 100%;
-    padding: 15px 30px;
-    margin-top: 20px;
-    
-    /* GELİŞTİRİLDİ: Daha lüks bir görünüm */
-    background: linear-gradient(90deg, #332200, #443311);
-    border-top: 3px solid #FFD700; 
-    border-radius: 0 0 16px 16px;
-    
-    display: flex;
-    justify-content: flex-end; 
-    gap: 10px;
-    
-    color: #f0e6d2; 
-    font-size: 18px;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px #000;
-    box-shadow: 0 -8px 20px rgba(0,0,0,0.7), inset 0 5px 10px rgba(255, 215, 0, 0.2);
-}
-
-#playerYangAmount {
-    /* GELİŞTİRİLDİ: Daha belirgin yeşil ve animasyon */
-    color: #00ff00; 
-    font-size: 22px;
-    text-shadow: 0 0 8px #00ff00;
-    animation: yang-glow 3s infinite alternate;
-}
-@keyframes yang-glow {
-    from { text-shadow: 0 0 8px #00ff00; }
-    to { text-shadow: 0 0 12px #33ff33; }
-}
-
-/* TOOLTIP - Detaylı item bilgisi */
-.inv-slot:hover::after,
-.equip-slot:hover::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    /* GELİŞTİRİLDİ: Konum ve boyut */
-    bottom: 80px; 
-    left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
-    color: #f0e6d2;
-    padding: 20px 25px;
-    border: 4px solid #DAA520; 
+.panel,
+.inventory-panel,
+.char-panel,
+.shop-panel,
+.skill-panel {
+    background: radial-gradient(circle at top, #181818 0%, #070707 60%, #020202 100%);
+    border: 3px solid #3c3c3c;
     border-radius: 10px;
+    box-shadow:
+        0 0 26px rgba(255,0,0,0.30),
+        inset 0 0 14px rgba(0,0,0,0.95);
+    padding: 15px;
+    color: #d8d8d8;
+    pointer-events: auto;
+    backdrop-filter: blur(4px);
+}
+
+.panel-header,
+.shop-panel-header,
+.skill-panel-header,
+.char-panel-header {
+    background: linear-gradient(180deg, #262626, #121212);
+    border-bottom: 2px solid #5c0000;
+    border-radius: 8px 8px 0 0;
+    padding: 9px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: inset 0 -3px 6px rgba(0,0,0,0.9);
+}
+
+.panel-header h3,
+.shop-panel-header h3,
+.skill-panel-header h3,
+.char-panel-header h3,
+.panel-header h4 {
+    color: #ff3333;
+    font-size: 16px;
+    text-shadow: 0 0 6px rgba(255,60,60,1);
+}
+
+/* Kapatma butonları */
+.close-btn,
+#characterPanelCloseBtn,
+#skillPanelCloseBtn,
+#shopPanelCloseBtn,
+#blacksmithPanelCloseBtn,
+#tradeCancelBtn,
+#targetPlayerMenuCloseBtn,
+#skillChoiceCloseBtn {
+    background: radial-gradient(circle at 30% 0%, #770000, #220000);
+    color: #ffaaaa;
+    border: 2px solid #ff0000;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    font-weight: bold;
     font-size: 14px;
-    font-weight: normal;
-    white-space: pre-line;
-    z-index: 9999;
-    min-width: 200px;
-    max-width: 300px;
+    box-shadow: 0 0 9px rgba(255,0,0,0.6);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.close-btn:hover,
+#characterPanelCloseBtn:hover,
+#skillPanelCloseBtn:hover,
+#shopPanelCloseBtn:hover,
+#blacksmithPanelCloseBtn:hover,
+#tradeCancelBtn:hover,
+#targetPlayerMenuCloseBtn:hover,
+#skillChoiceCloseBtn:hover {
+    background: radial-gradient(circle at 30% 0%, #aa0000, #330000);
+    box-shadow: 0 0 16px rgba(255,50,50,0.95);
+    transform: scale(1.1);
+}
+
+/* Genel buton */
+button {
+    background: linear-gradient(180deg, #262626, #111);
+    color: #e0e0e0;
+    border: 2px solid #3c3c3c;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-shadow: 0 0 3px #000;
+    box-shadow: inset 0 0 6px rgba(255,0,0,0.12);
+}
+button:hover {
+    background: linear-gradient(180deg, #3a0000, #150000);
+    border-color: #c92020;
+    color: #ffecec;
+    box-shadow: 0 0 18px rgba(255,0,0,0.7);
+}
+button:active {
+    transform: scale(0.96);
+    background: linear-gradient(180deg, #550000, #220000);
+}
+
+/* Tooltip */
+.tooltip {
+    background: linear-gradient(180deg, #220000, #000);
+    color: #ffdddd;
+    padding: 8px 10px;
+    border: 1px solid #aa0000;
+    border-radius: 8px;
+    box-shadow: 0 0 18px rgba(255,0,0,0.55);
+    font-size: 12px;
+    max-width: 240px;
     text-align: left;
-    box-shadow: 0 15px 40px rgba(0,0,0,1), 0 0 25px rgba(255, 170, 0, 0.7);
-    backdrop-filter: blur(8px);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-    line-height: 1.5;
 }
 
-.inv-slot[data-tooltip]:hover::after,
-.equip-slot[data-tooltip]:hover::after {
-    opacity: 1;
-    /* GELİŞTİRİLDİ: Hafif yukarı kalkış efekti */
-    transform: translateX(-50%) translateY(-10px); 
-}
+/* ========== GAME WORLD & CANVAS ========== */
 
-/* --- TAM EKRAN VE BAŞLANGIÇ --- */
 #gameWorld {
-    position: fixed;
-    top: 0;
-    left: 0;
+    position: relative;
     width: 100vw;
     height: 100vh;
-    margin: 0;
-    padding: 0;
-    background: #000;
+    overflow: hidden;
+}
+
+#gameUI {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
 }
 
 #gameCanvas {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: #000;
-    cursor: url('/assets/default_cursor.png'), crosshair;
-}
-
-/* --- YENİ EKLENEN KARAKTER SEÇİM EKRANI STİLİ --- */
-#characterSelectionScreen {
-    width: 700px; 
-    margin: 0 auto;
-    background-color: #1a1a1a;
-    background-image: url('/assets/creation_bg.jpg'); 
-    background-size: cover;
-    border: 4px solid #a02a00; 
-    border-radius: 10px;
-    padding: 30px;
-    box-shadow: 0 0 25px rgba(255, 85, 0, 0.7);
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 100;
-    pointer-events: auto;
-    text-align: center;
-}
-
-#characterList {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 15px;
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 8px;
-    border: 1px solid #6b471c;
-}
-
-/* Karakter listesindeki butonlar için özel stil (choice-btn'in üzerine yazar) */
-#characterList .choice-btn {
+    inset: 0;
     width: 100%;
-    text-align: left;
-    justify-content: flex-start;
-    padding: 15px 25px;
-    border: 3px solid #6b471c;
-    background: linear-gradient(90deg, #333, #111);
-    font-size: 18px;
+    height: 100%;
+    background: transparent;
+    z-index: 1; /* Tüm paneller bunun üstünde */
 }
 
-#characterList .choice-btn:hover {
-    background: linear-gradient(90deg, #444, #222);
-    border-color: #DAA520;
-}
+/* ========== LOGIN EKRANI ========== */
 
-#characterList .choice-btn.selected {
-    background: linear-gradient(90deg, #a02a00, #661a00);
-    border-color: #ff5500;
-    box-shadow: 0 0 15px rgba(255, 85, 0, 0.9);
-    transform: scale(1.02); /* Seçim butonu çok büyümemeli */
-}
-
-/* Yeni Karakter Slotu butonu */
-#characterList .new-char-slot {
-    background: linear-gradient(90deg, #004d40, #00251a); /* Yeşil/turkuaz tonları */
-    border-color: #4CAF50;
-    color: #fff;
-    font-weight: bold;
-}
-#characterList .new-char-slot:hover {
-    background: linear-gradient(90deg, #005d50, #00352a);
-    box-shadow: 0 0 15px rgba(76, 175, 80, 0.7);
-}
-
-#selectCharBtn, #createCharBtn {
-    /* Karakter Oluştur/Seç butonları */
-    padding: 18px 40px;
-    font-size: 24px;
-    background: linear-gradient(180deg, #ff5500, #a02a00);
-    border: 4px solid #ffaa00;
-    color: #fff;
-    cursor: pointer;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-    font-weight: bold;
-    margin-top: 30px;
-    text-shadow: 2px 2px 3px #000;
-    box-shadow: 0 5px 15px rgba(255, 85, 0, 0.7);
-    width: 80%; /* Biraz daraltıldı */
-}
-
-#selectCharBtn:disabled, #createCharBtn:disabled {
-    opacity: 0.6;
-    background: #333;
-    border-color: #666;
-    box-shadow: none;
-    cursor: not-allowed;
-    transform: none;
-}
-#createCharBtn {
-    /* Oluşturma butonu için daha yumuşak renk */
-    background: linear-gradient(180deg, #008000, #005000);
-    border-color: #33ff33;
-    box-shadow: 0 5px 15px rgba(0, 128, 0, 0.7);
-}
-#createCharBtn:hover {
-     background: linear-gradient(180deg, #009000, #006000);
-}
-
-
-/* --- KARAKTER OLUŞTURMA EKRANI (Mevcut, Seçim Ekranından sonra gelir) --- */
-#creationScreen {
-    width: 700px; 
-    margin: 0 auto;
-    background-color: #1a1a1a;
-    background-image: url('/assets/creation_bg.jpg'); 
-    background-size: cover;
-    border: 4px solid #a02a00; 
-    border-radius: 10px;
-    padding: 30px;
-    box-shadow: 0 0 25px rgba(255, 85, 0, 0.7);
+#loginScreen {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    z-index: 100;
-    pointer-events: auto;
+    width: 460px;
+    padding: 28px;
+    background: radial-gradient(circle at top, #151515, #050505 75%);
+    border-radius: 12px;
+    border: 3px solid #660000;
+    box-shadow: 0 0 40px rgba(255,0,0,0.55);
     text-align: center;
+    pointer-events: auto;
+    z-index: 20;
+}
+
+#loginScreen h1 {
+    margin-bottom: 18px;
+    font-size: 24px;
+}
+
+#accountNameInput,
+#passwordInput,
+#registerPasswordConfirm {
+    width: 80%;
+    padding: 10px;
+    margin-top: 8px;
+    background: #000;
+    border: 2px solid #550000;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    text-align: center;
+    box-shadow: inset 0 0 6px rgba(0,0,0,0.8);
 }
 
 .choice-block {
-    margin-bottom: 25px;
+    margin-bottom: 14px;
     padding: 10px;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0,0,0,0.5);
     border-radius: 8px;
+    border: 1px solid #2b0000;
 }
 
 .button-group {
     display: flex;
+    gap: 10px;
     justify-content: center;
-    gap: 15px;
-    margin-top: 10px;
+    flex-wrap: wrap;
 }
 
-.choice-btn {
-    padding: 12px 20px;
-    background-color: #333;
-    border: 3px solid #6b471c;
-    color: #eee;
-    font-size: 18px;
-    cursor: pointer;
-    border-radius: 8px;
-    transition: all 0.3s ease;
-    text-shadow: 1px 1px 1px #000;
-}
+/* ========== KARAKTER SEÇİMİ & OLUŞTURMA ========== */
 
-.choice-btn:hover {
-    background-color: #444;
-    border-color: #DAA520;
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
-}
-
-.choice-btn.selected {
-    background-color: #a02a00; 
-    color: #fff;
-    border-color: #ff5500;
-    font-weight: bold;
-    box-shadow: 0 0 15px rgba(255, 85, 0, 0.9);
-    transform: scale(1.1);
-}
-
-#playerNameInput {
-    padding: 12px;
-    font-size: 17px;
-    background-color: #000;
-    border: 2px solid #a02a00;
-    color: #fff;
-    border-radius: 8px;
-    width: 60%;
-    text-align: center;
-    box-shadow: inset 0 0 5px rgba(255, 85, 0, 0.5);
-}
-
-#startGameBtn {
-    padding: 18px 40px;
-    font-size: 24px;
-    background: linear-gradient(180deg, #ff5500, #a02a00);
-    border: 4px solid #ffaa00;
-    color: #fff;
-    cursor: pointer;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-    font-weight: bold;
-    margin-top: 30px;
-    text-shadow: 2px 2px 3px #000;
-    box-shadow: 0 5px 15px rgba(255, 85, 0, 0.7);
-}
-
-#startGameBtn:hover {
-    background: linear-gradient(180deg, #ff6611, #c03a10);
-    box-shadow: 0 0 20px rgba(255, 85, 0, 1);
-    transform: translateY(-2px);
-}
-
-/* --- GENEL PANELLER (K, C, SHOP) --- */
-.skill-panel, .char-panel, .shop-panel, #blacksmithPanel, #targetPlayerMenu, #partyInvitePanel, #tradeRequestPanel, #tradePanel { 
+#characterSelectionScreen,
+#creationScreen {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 420px; 
-    /* GELİŞTİRİLDİ: Derin panel çerçevesi */
-    background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
-    border: 5px solid #6b471c; 
-    border-image: linear-gradient(135deg, #9C7836, #6b471c, #9C7836) 1;
-    border-width: 5px;
-    border-radius: 10px;
-    z-index: 100;
-    color: #f0e6d2;
-    box-shadow: 0 0 35px rgba(0,0,0,1), 0 0 20px rgba(107, 71, 28, 0.9);
+    background: radial-gradient(circle at top, #171717, #050505);
+    border-radius: 12px;
+    border: 3px solid #550000;
+    box-shadow: 0 0 38px rgba(255,0,0,0.5);
+    text-align: center;
     pointer-events: auto;
+    z-index: 20;
 }
 
-.char-panel {
-    width: 380px;
-}
-.shop-panel {
-    width: 500px;
+#characterSelectionScreen {
+    width: 520px;
+    padding: 24px;
 }
 
-.skill-panel-header, .char-panel-header, .shop-panel-header, .panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 20px;
-    /* GELİŞTİRİLDİ: Header için belirgin doku/çerçeve */
-    background: linear-gradient(90deg, #3a3a3a, #2a2a2a); 
-    border-bottom: 3px solid #6b471c;
-    border-radius: 6px 6px 0 0;
-    box-shadow: inset 0 -5px 10px rgba(0,0,0,0.5);
+#creationScreen {
+    width: 720px;
+    padding: 26px;
 }
 
-.skill-panel-header h3, .char-panel-header h3, .shop-panel-header h3, .panel-header h3, .panel-header h4 {
-    margin: 0;
-    color: #FFD700;
-    text-shadow: 1px 1px 3px #000;
-}
-
-#skillPanelCloseBtn, #characterPanelCloseBtn, #shopPanelCloseBtn, .close-btn {
-    /* GELİŞTİRİLDİ: Daha agresif ve 3D kapatma butonu */
-    background: #ff2222;
-    color: white;
-    border: 3px solid #ff7777;
-    cursor: pointer;
-    font-weight: bold;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    font-size: 16px;
-    transition: all 0.2s;
-    box-shadow: 0 3px 0 #a00, inset 0 0 5px #fcc;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-#skillPanelCloseBtn:hover, #characterPanelCloseBtn:hover, #shopPanelCloseBtn:hover, .close-btn:hover {
-    background: #ff5555;
-    box-shadow: 0 0 15px rgba(255, 85, 85, 1), 0 3px 0 #a00;
-    transform: scale(1.1);
-}
-
-/* --- KARAKTER & BECERİ İÇERİKLERİ --- */
-/* Karakter Paneli İçerik Stilleri */
-.char-panel-content {
-    display: flex;
-    flex-direction: column;
-    padding: 15px;
-    gap: 15px;
-}
-.char-info-box {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 12px;
+#characterList .char-slot {
+    padding: 8px 10px;
     border-radius: 6px;
     border: 1px solid #333;
+    background: rgba(0,0,0,0.6);
+    cursor: pointer;
+    transition: all 0.2s;
 }
-.char-info-name {
-    font-size: 18px;
-    font-weight: bold;
-    color: #ffaa00;
-    border-bottom: 2px solid #333;
-    padding-bottom: 8px;
-    margin-bottom: 12px;
-    text-shadow: 0 0 5px #000;
+#characterList .char-slot:hover,
+#characterList .char-slot.selected {
+    border-color: #c92020;
+    box-shadow: 0 0 14px rgba(255,0,0,0.7);
 }
-.char-info-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 14px;
-    margin-bottom: 6px;
-    color: #ccc;
+
+.choice-btn {
+    padding: 8px 14px;
+    background: #181818;
+    border: 2px solid #6b471c;
+    color: #eee;
+    border-radius: 6px;
+    cursor: pointer;
+    text-shadow: 1px 1px 1px #000;
+    transition: all 0.25s;
 }
-.char-info-row span:last-child {
-    font-weight: bold;
+.choice-btn:hover {
+    background: #282828;
+    border-color: #daa520;
+    box-shadow: 0 0 10px rgba(255,215,0,0.4);
+}
+.choice-btn.selected {
+    background: #8b0000;
+    border-color: #ff5500;
     color: #fff;
-    text-shadow: 0 0 3px #000;
 }
-.char-stats-box {
-    background: rgba(0, 0, 0, 0.2);
-    padding: 12px;
-    border-radius: 6px;
-    border: 1px solid #333;
-}
-.char-stat-row {
+
+.creation-content {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
+    align-items: flex-start;
+    gap: 18px;
+    margin-top: 10px;
 }
-.stat-name {
-    font-weight: bold;
-    text-transform: uppercase;
-    font-size: 16px;
-}
-.stat-name.vit { color: #ff5555; }
-.stat-name.str { color: #ffaa00; }
-.stat-name.int { color: #55aaff; }
-.stat-name.dex { color: #33ff33; }
-
-.stat-plus-btn {
-    /* GELİŞTİRİLDİ: Daha ışıltılı yeşil stat butonu */
-    background: linear-gradient(180deg, #7CFC00, #3CB371);
-    color: white;
-    border: 3px solid #AAFF00;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    font-size: 20px;
-    font-weight: bold;
-    cursor: pointer;
-    line-height: 28px;
-    transition: all 0.2s;
-    box-shadow: 0 0 10px rgba(124, 252, 0, 1), 0 3px 0 #1e7041;
-}
-.stat-plus-btn:hover {
-    background: linear-gradient(180deg, #66BB6A, #3CB371);
-    box-shadow: 0 0 15px rgba(76, 175, 80, 1);
-    transform: scale(1.1);
-}
-.stat-plus-btn:active {
-    /* GELİŞTİRİLDİ: Basılma hissi */
-    transform: translateY(1px) scale(1.05);
-    box-shadow: 0 2px 0 #1e7041, 0 0 10px rgba(124, 252, 0, 1);
-}
-
-.char-panel-footer {
-    padding: 10px 15px;
-    text-align: center;
-    border-top: 1px solid #333;
-}
-#charPointsDisplay {
-    color: #FFD700;
-    font-weight: bold;
-    font-size: 16px;
-}
-/* Beceri Paneli İçerik Stilleri */
-#skillPanelList {
-    padding: 15px;
-    max-height: 350px;
-    overflow-y: auto;
-}
-.skill-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px;
-    border-bottom: 1px solid #333;
-    transition: background 0.2s;
-}
-.skill-row:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
-.skill-info {
-    flex-grow: 1;
-    margin-left: 15px;
-}
-.skill-name {
-    font-weight: bold;
-    color: #ffaa00;
-}
-.skill-level {
-    font-size: 12px;
-    color: #ccc;
-}
-.skill-icon {
-    width: 48px;
-    height: 48px;
-    background: #222;
-    border: 2px solid #555;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    position: relative;
-    border-radius: 6px;
-    overflow: hidden;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
-}
-.skill-icon img {
-    width: 90%;
-    height: 90%;
-    object-fit: cover;
-    border-radius: 4px;
-    pointer-events: none;
-}
-.skill-icon[draggable="true"] {
-    cursor: grab;
-    border-color: #33ff33;
-    box-shadow: 0 0 10px rgba(51, 255, 51, 0.6);
-}
-.skill-plus-btn {
-    background: linear-gradient(180deg, #4CAF50, #2E8B57);
-    color: white;
-    border: 2px solid #7CFC00;
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
-    font-size: 22px;
-    font-weight: bold;
-    cursor: pointer;
-    line-height: 30px;
-    flex-shrink: 0;
-    transition: all 0.2s;
-    box-shadow: 0 0 8px rgba(76, 175, 80, 0.7);
-}
-.skill-plus-btn:hover {
-    background: linear-gradient(180deg, #66BB6A, #3CB371);
-    box-shadow: 0 0 15px rgba(76, 175, 80, 1);
-    transform: scale(1.1);
-}
-.skill-plus-btn:active {
-    background: linear-gradient(180deg, #3CB371, #2E8B57);
-    transform: translateY(1px) scale(1.05);
-    box-shadow: 0 2px 0 #1e7041, 0 0 10px rgba(124, 252, 0, 1);
-}
-.skill-panel-footer {
-    padding: 10px 15px;
-    text-align: center;
-    border-top: 1px solid #333;
-}
-#skillPointsDisplay {
-    color: #FFD700;
-    font-weight: bold;
-    font-size: 16px;
-}
-/* --- BUFFS --- */
-#buffsPanel {
-    position: absolute;
-    top: 20px;
-    right: 220px; 
-    display: flex;
-    flex-direction: row;
-    gap: 8px;
-    pointer-events: none;
-    z-index: 10;
-}
-
-.buff-icon {
-    width: 45px;
-    height: 45px;
-    /* GELİŞTİRİLDİ: Işıltılı mavi çerçeve ve desen */
-    background: rgba(0, 0, 0, 0.8) url('/assets/magic_pattern.png') repeat;
-    border: 3px solid #55aaff; 
-    border-radius: 8px;
-    overflow: hidden;
-    position: relative;
-    box-shadow: 0 0 15px rgba(85, 170, 255, 1), inset 0 0 8px rgba(255, 255, 255, 0.2);
-    pointer-events: auto;
-    animation: buff-pulse 4s infinite alternate;
-}
-
-.buff-icon.debuff {
-    /* GELİŞTİRİLDİ: Zehirli kırmızı çerçeve ve titreşim */
-    border-color: #ff0000;
-    box-shadow: 0 0 15px rgba(255, 0, 0, 1), inset 0 0 8px rgba(255, 255, 255, 0.2);
-    animation: debuff-pulse 1s infinite;
-}
-
-@keyframes buff-pulse {
-    from { box-shadow: 0 0 10px rgba(85, 170, 255, 0.8); }
-    to { box-shadow: 0 0 20px rgba(85, 170, 255, 1.2); }
-}
-
-@keyframes debuff-pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(0.95); }
-    100% { transform: scale(1); }
-}
-
-.buff-icon .countdown-overlay {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    color: #ffaa00;
-    font-size: 14px; /* GELİŞTİRİLDİ: Daha büyük font */
-    font-weight: bold;
-    text-align: center;
-    line-height: 45px; /* GELİŞTİRİLDİ: Ortalama */
-    text-shadow: 0 0 5px #000;
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
-}
-
-/* --- MAĞAZA STİLLERİ --- */
-.shop-tabs {
-    display: flex;
-    border-bottom: 2px solid #6b471c;
-    pointer-events: auto;
-}
-
-.tab-btn {
-    flex: 1;
-    padding: 12px;
-    border: none;
-    background: #333;
-    color: #ccc;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-weight: bold;
-    font-size: 16px;
-    border-right: 1px solid #444;
-}
-
-.tab-btn.active {
-    background: #6b471c; 
-    color: #FFD700;
-    text-shadow: 0 0 5px #000;
-    box-shadow: inset 0 -5px 10px rgba(0,0,0,0.5);
-}
-
-.shop-content {
-    padding: 15px;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.shop-list {
+.creation-left-side {
+    width: 60%;
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
-
-.shop-item-row, .sell-item-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: rgba(0, 0, 0, 0.4);
+.creation-right-side {
+    width: 40%;
+    background: rgba(0,0,0,0.5);
+    border-radius: 8px;
+    border: 1px solid #6b471c;
     padding: 10px;
-    border-radius: 6px;
-    border: 1px solid #333;
-    transition: background 0.2s;
-}
-.shop-item-row:hover, .sell-item-row:hover {
-    background: rgba(107, 71, 28, 0.3);
-}
-
-.item-info {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    flex-grow: 1;
 }
 
-.shop-icon {
-    width: 50px;
-    height: 50px;
-    border: 2px solid #777;
-    border-radius: 6px;
+#classPreviewImage {
+    width: 220px;
+    height: 360px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    border-radius: 4px;
+    border: 2px solid #ffd700;
+    background: #111;
+    box-shadow: 0 0 18px rgba(255,215,0,0.6);
+    margin-bottom: 8px;
+}
+
+/* ========== PLAYER STATS (Sol Üst) ========== */
+
+#playerStats {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    background: radial-gradient(circle at top, #151515, #050505);
+    border: 3px solid #3a0000;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 0 22px rgba(255,0,0,0.5), inset 0 0 10px rgba(0,0,0,1);
+    min-width: 210px;
+    pointer-events: auto;
+    z-index: 5;
+}
+
+.stat-row { margin-bottom: 7px; }
+
+.stat-label {
+    color: #ff4444;
+    font-size: 12px;
+    font-weight: bold;
+    text-shadow: 0 0 4px #000;
+}
+.stat-value {
+    color: #ddd;
+    font-size: 14px;
+}
+
+.hp-bar,
+.mp-bar,
+.exp-bar {
+    width: 180px;
+    height: 14px;
+    background: #090909;
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: inset 0 0 5px #000;
+    margin-top: 3px;
+    position: relative;
+}
+.bar-fill {
+    height: 100%;
+    width: 0;
+    transition: width 0.3s;
+}
+.hp-bar .bar-fill {
+    background: linear-gradient(90deg, #550000, #ff0000);
+    box-shadow: 0 0 12px rgba(255,0,0,0.8);
+}
+.mp-bar .bar-fill {
+    background: linear-gradient(90deg, #000033, #0066ff);
+    box-shadow: 0 0 12px rgba(0,90,255,0.8);
+}
+.exp-bar .bar-fill {
+    background: linear-gradient(90deg, #004000, #00ff66);
+}
+
+.stat-text,
+.exp-text {
+    position: absolute;
+    width: 100%;
+    top: 0;
+    left: 0;
+    font-size: 10px;
+    color: #f5f5f5;
+    text-align: center;
+    text-shadow: 0 0 4px #000;
+}
+
+/* ========== ACTION BAR (Alt Orta) ========== */
+
+#actionBar {
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    background: radial-gradient(circle at top, #111, #020202);
+    border-radius: 12px;
+    border: 3px solid #550000;
+    box-shadow: 0 0 26px rgba(255,0,0,0.6), inset 0 0 14px rgba(0,0,0,0.95);
+    z-index: 8;
+    pointer-events: auto;
+}
+
+.action-slot {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 7px;
+    border: 2px solid #333;
+    background: radial-gradient(circle at center, #191919, #050505);
+    box-shadow: inset 0 0 10px #000;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-right: 15px;
-    flex-shrink: 0;
-    background: #111;
-}
-
-.item-details {
-    flex-grow: 1;
-}
-
-.shop-item-name {
-    font-weight: bold;
-    color: #f0e6d2;
-}
-
-.shop-price {
-    font-size: 16px;
-    color: #FFD700;
-    font-weight: bold;
-    margin-right: 20px;
-}
-
-.buy-btn, .sell-btn {
-    padding: 10px 20px;
-    background: #0044AA; 
-    color: white;
-    border: 2px solid #55aaff;
-    border-radius: 6px;
+    transition: all 0.15s;
     cursor: pointer;
-    font-weight: bold;
-    flex-shrink: 0;
+}
+.action-slot:hover {
+    border-color: #c92020;
+    box-shadow: 0 0 16px rgba(255,0,0,0.85), inset 0 0 6px rgba(255,0,0,0.4);
+    transform: translateY(-2px);
+}
+.action-slot.active {
+    border-color: #ff0000;
+    box-shadow: 0 0 20px rgba(255,0,0,1);
+}
+.hotkey-label {
+    position: absolute;
+    bottom: 2px;
+    right: 3px;
+    background: #300000;
+    color: #ffcccc;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid #550000;
+}
+
+/* ========== SAĞ PANEL & ENVANTER & MINIMAP ========== */
+
+#rightPanel {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    z-index: 6;
+    pointer-events: none;
+}
+
+/* Envanter butonu (I) */
+.panel-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: radial-gradient(circle at 30% 0%, #550000, #111);
+    border: 2px solid #771111;
+    color: #ffdddd;
+    font-size: 14px;
+    text-align: center;
+    line-height: 22px;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(255,0,0,0.7);
+    pointer-events: auto;
     transition: all 0.2s;
 }
-
-.buy-btn:hover {
-    background: #0055BB;
-    box-shadow: 0 0 10px rgba(85, 170, 255, 0.7);
+.panel-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 18px rgba(255,0,0,1);
 }
 
-.sell-btn {
-    background: #AA4400; 
-    border-color: #ff5500;
-}
-.sell-btn:hover {
-    background: #BB5511;
-    box-shadow: 0 0 10px rgba(255, 85, 0, 0.7);
+/* ENVANTER: SAĞ ALTA ALINDI */
+#inventoryPanel.inventory-panel {
+    position: fixed;
+    bottom: 92px;       /* actionBar'ın biraz üstü */
+    right: 32px;
+    left: auto;
+    top: auto;
+    width: 700px;
+    height: 520px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 9;
+    pointer-events: auto;
 }
 
-.shop-panel-footer {
-    padding: 12px 20px;
-    text-align: right;
-    font-weight: bold;
-    background: rgba(107, 71, 28, 0.4);
-    border-top: 2px solid #6b471c;
-    color: #FFD700;
+/* Envanter iç düzen */
+.inventory-content-wrapper {
+    display: flex;
+    gap: 18px;
+    flex: 1;
+}
+
+/* Karakter silüet alanı */
+.character-section {
+    position: relative;
+    width: 240px;
+    height: 440px;
+    background: radial-gradient(circle at center, #101010, #000);
+    border-radius: 12px;
+    border: 2px solid #330000;
+    box-shadow: inset 0 0 20px #000, 0 0 18px rgba(255,0,0,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.character-silhouette {
+    width: 150px;
+    height: 360px;
+    background: url('/assets/silhouette.png') center/contain no-repeat;
+    opacity: 0.65;
+    filter: drop-shadow(0 0 22px #aa0000);
+}
+
+/* Ekipman slotları */
+.equip-slot {
+    position: absolute;
+    width: 58px;
+    height: 58px;
+    background: radial-gradient(circle at center, #222, #000);
+    border-radius: 9px;
+    border: 2px solid #444;
+    box-shadow: inset 0 0 10px #000;
+    transition: all 0.2s;
+}
+.equip-slot:hover {
+    border-color: #ff0000;
+    box-shadow: 0 0 18px rgba(255,0,0,0.8);
+    transform: scale(1.06);
+}
+.equip-slot.equipped {
+    border-color: #c92020;
+    background: radial-gradient(circle at center, rgba(255,0,0,0.18), #000);
+}
+
+/* Pozisyonlar */
+.equip-slot[data-type="helmet"]   { top: 14px;  left: 50%; transform: translateX(-50%); }
+.equip-slot[data-type="necklace"] { top: 84px;  left: 50%; transform: translateX(-50%); }
+.equip-slot[data-type="armor"]    { top: 154px; left: 50%; transform: translateX(-50%); }
+.equip-slot[data-type="weapon"]   { top: 154px; left: 10px; }
+.equip-slot[data-type="shield"]   { top: 154px; right: 10px; }
+.equip-slot[data-type="bracelet"] { top: 230px; left: 10px; }
+.equip-slot[data-type="earring"]  { top: 230px; right: 10px; }
+.equip-slot[data-type="shoes"]    { bottom: 18px; left: 50%; transform: translateX(-50%); }
+
+/* Envanter grid */
+#inventoryGrid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    padding: 10px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 12px;
+    border: 2px solid #440000;
+    box-shadow: inset 0 0 15px #000;
+}
+.inv-slot {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    border-radius: 8px;
+    border: 2px solid #333;
+    background: radial-gradient(circle at center, #1a1a1a, #050505);
+    box-shadow: inset 0 0 8px #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+.inv-slot:hover {
+    border-color: #c92020;
+    box-shadow: 0 0 15px rgba(255,0,0,0.6);
+    transform: translateY(-2px);
+}
+.inv-slot img {
+    width: 90%;
+    height: 90%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 5px rgba(255,0,0,0.4));
+}
+.item-quantity {
+    position: absolute;
+    bottom: 3px;
+    right: 4px;
+    padding: 1px 4px;
+    font-size: 11px;
+    color: #ff6666;
+    background: #2a0000;
+    border-radius: 3px;
+    border: 1px solid #550000;
+}
+.item-plus {
+    position: absolute;
+    bottom: 0px;
+    right: 2px;
+    background-color: rgba(0,0,0,0.8);
+    color: #ffcc00;
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    line-height: 1;
+    pointer-events: none;
+    border: 1px solid rgba(255,204,0,0.3);
+}
+
+/* Envanter Yang */
+.inventory-yang-display {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 13px;
+    color: #ffdddd;
 }
 
-/* --- DİĞER PANELER --- */
-.skill-choice-panel {
+/* Mini Map */
+.mini-map {
+    width: 150px;
+    height: 150px;
+    background: radial-gradient(circle at center, #111, #000);
+    border-radius: 12px;
+    border: 2px solid #550000;
+    box-shadow: 0 0 18px rgba(255,0,0,0.4);
+    pointer-events: auto;
+}
+
+/* ========== KARAKTER PANELİ (C) ========== */
+
+.char-panel {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 450px;
-    background: linear-gradient(135deg, #101010, #000000);
-    border: 3px solid #ff5500;
-    border-radius: 10px;
-    padding: 25px;
-    z-index: 1000;
-    color: white;
-    box-shadow: 0 0 30px rgba(255, 85, 0, 0.8);
-    pointer-events: auto;
-    text-align: center;
+    width: 420px;
+    z-index: 12;
 }
-#skillChoiceTitle {
-    color: #ffaa00;
-    text-shadow: 1px 1px 3px #000;
-}
-#skillChoiceDesc {
-    color: #ccc;
-    margin-top: 10px;
-    font-style: italic;
-}
-#skillChoiceButtons {
+
+.char-panel-content {
     display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin: 20px 0;
+    gap: 14px;
+    margin-top: 10px;
 }
-#skillChoiceButtons .choice-btn {
-    padding: 15px 25px;
-    border: 3px solid #ff5500;
-    background-color: #331100;
+
+.char-info-box {
+    flex: 1;
+    padding: 10px;
+    background: rgba(0,0,0,0.6);
+    border-radius: 8px;
+    border: 1px solid #330000;
+    box-shadow: inset 0 0 10px #000;
 }
-#skillChoiceButtons .choice-btn.selected {
-     background-color: #a02a00;
+.char-info-name {
+    font-weight: bold;
+    font-size: 17px;
+    color: #c92020;
+    border-bottom: 1px solid #550000;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
 }
-#skillChoiceCloseBtn {
-    padding: 10px 20px;
-    background: #444;
-    color: #ccc;
-    border: 1px solid #666;
-    border-radius: 5px;
-    cursor: pointer;
+.char-info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 3px;
 }
-/* Notification Panel (Level Up, vb.) */
-.notification-panel {
+.char-stats-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.char-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: space-between;
+}
+.stat-name {
+    width: 40px;
+    font-weight: bold;
+}
+.stat-plus-btn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 50%;
+    font-weight: bold;
+    background: #330000;
+    border-color: #880000;
+}
+
+/* ========== SKILL PANELİ (K) ========== */
+
+.skill-panel {
     position: absolute;
-    top: -150px;
+    top: 53%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 520px;
+    z-index: 12;
+}
+#skillPanelList {
+    max-height: 260px;
+    overflow-y: auto;
+    margin-top: 8px;
+    padding-right: 4px;
+}
+.skill-panel-footer {
+    margin-top: 8px;
+    text-align: right;
+    font-size: 13px;
+    color: #ffcccc;
+}
+
+/* ========== SHOP PANELİ (Satın Al / Sat) ========== */
+
+.shop-panel {
+    position: absolute;
+    top: 52%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 520px;
+    z-index: 11;
+}
+
+.shop-tabs {
+    display: flex;
+    border-bottom: 1px solid #440000;
+    margin-top: 6px;
+}
+.tab-btn {
+    flex: 1;
+    border: none;
+    background: #111;
+    color: #aaa;
+    font-weight: bold;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.tab-btn.active {
+    background: #3a0000;
+    color: #ff4444;
+    box-shadow: inset 0 -3px 6px rgba(255,0,0,0.4);
+}
+
+/* SAT / BUY TAB GÖRÜNÜRLÜK DÜZELTME */
+.shop-tab { display: block; }
+.shop-tab.hidden { display: none !important; }
+
+.shop-content {
+    padding: 10px 4px;
+    max-height: 260px;
+    overflow-y: auto;
+}
+.shop-list { display: flex; flex-direction: column; gap: 4px; }
+
+.shop-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(10,0,0,0.7);
+    border: 1px solid #330000;
+    transition: all 0.2s;
+}
+.shop-item-row:hover { background: rgba(50,0,0,0.9); }
+.shop-item-name {
+    color: #ffcccc;
+    font-weight: bold;
+    font-size: 13px;
+}
+.shop-price {
+    color: #ff4444;
+    font-weight: bold;
+    font-size: 13px;
+}
+.shop-panel-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    font-size: 13px;
+}
+
+/* ========== TRADE PANELİ ========== */
+
+#tradePanel {
+    position: absolute;
+    top: 52%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 640px;
+    height: 420px;
+    z-index: 12;
+}
+.trade-container {
+    display: flex;
+    gap: 12px;
+    padding: 10px;
+}
+.trade-side {
+    flex: 1;
+    background: rgba(0,0,0,0.6);
+    border-radius: 8px;
+    border: 1px solid #330000;
+}
+.trade-header span {
+    color: #ff4444;
+    font-weight: bold;
+    font-size: 13px;
+}
+.trade-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    padding: 8px;
+}
+.trade-slot {
+    width: 58px;
+    height: 58px;
+    border-radius: 6px;
+    background: radial-gradient(circle at center, #191919, #050505);
+    border: 2px solid #333;
+    box-shadow: inset 0 0 8px #000;
+}
+.trade-yang {
+    padding: 6px 8px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+}
+.trade-footer {
+    padding: 8px 10px;
+    text-align: right;
+}
+.trade-status {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid #555;
+    margin-left: auto;
+}
+.trade-status.locked {
+    background: #003300;
+    border-color: #00ff00;
+    box-shadow: 0 0 8px #00ff00;
+}
+
+/* Trade request popup */
+#tradeRequestPanel {
+    position: absolute;
+    top: 18%;
     left: 50%;
     transform: translateX(-50%);
-    width: 550px;
-    max-width: 90%;
-    background: rgba(30, 0, 0, 0.95);
-    border: 3px solid #ffaa00;
-    border-top: none;
-    border-radius: 0 0 15px 15px;
-    padding: 15px 30px;
-    z-index: 2000;
-    color: #FFD700;
-    box-shadow: 0 8px 25px rgba(255, 170, 0, 0.8);
-    text-align: center;
-    transition: top 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55); 
-    pointer-events: none;
+    width: 260px;
+    z-index: 13;
 }
-.notification-panel.show {
-    top: 0;
+
+/* ========== CHAT PANELİ ========== */
+
+#chatContainer {
+    position: absolute;
+    bottom: 98px;
+    left: 24px;
+    width: 420px;
+    height: 200px;
+    background: rgba(10,0,0,0.6);
+    border-radius: 8px;
+    border: 2px solid #440000;
+    box-shadow: 0 0 20px rgba(255,0,0,0.35);
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+    font-size: 13px;
+    z-index: 7;
 }
-#notificationTitle {
-    color: #ff5500;
-    font-size: 24px;
-    text-shadow: 0 0 5px #ff5500;
+#chatMessages {
+    flex: 1;
+    padding: 8px;
+    overflow-y: auto;
 }
-#notificationMessage {
+.chat-msg {
+    margin-bottom: 3px;
+    color: #e6e6e6;
+    text-shadow: 0 0 2px #000;
+}
+.chat-msg.system { color: #ff6666; font-style: italic; }
+.chat-msg.error { color: #ff2222; font-weight: bold; }
+.chat-msg.party { color: #7fffaa; }
+.chat-msg.whisper-sent,
+.chat-msg.whisper-received { color: #c58cff; }
+
+#chatInput {
+    border: none;
+    border-top: 1px solid #550000;
+    background: rgba(0,0,0,0.8);
     color: #fff;
-    font-size: 16px;
+    padding: 6px 8px;
+    font-size: 13px;
+    outline: none;
 }
-/* Uyarı Paneli (Hata mesajları, vb.) */
+
+/* ========== NOTIFICATION & WARN PANEL ========== */
+
+.notification-panel {
+    position: absolute;
+    top: -140px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 520px;
+    padding: 14px;
+    background: rgba(24,0,0,0.96);
+    border-radius: 0 0 12px 12px;
+    border: 2px solid #660000;
+    text-align: center;
+    color: #ff4444;
+    box-shadow: 0 0 26px rgba(255,0,0,0.75);
+    transition: top 0.5s ease;
+    z-index: 20;
+}
+.notification-panel.show { top: 0; }
+
+#warnPanel.warn-panel,
 .warn-panel {
     position: absolute;
     top: 60%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: linear-gradient(180deg, rgba(139, 0, 0, 0.95), rgba(80, 0, 0, 0.95));
-    border: 3px solid #FF4444;
-    border-radius: 15px;
-    padding: 15px 40px;
-    z-index: 900;
-    color: #FFFFFF;
-    font-size: 22px;
+    padding: 14px 28px;
+    background: linear-gradient(180deg, rgba(90,0,0,0.96), rgba(0,0,0,0.98));
+    border-radius: 10px;
+    border: 2px solid #ff0000;
+    color: #fff;
+    font-size: 18px;
     font-weight: bold;
-    text-shadow: 1px 1px 3px #000;
-    box-shadow: 0 0 25px rgba(255, 0, 0, 0.9);
-    pointer-events: none;
+    text-shadow: 0 0 6px #000;
+    box-shadow: 0 0 30px rgba(255,0,0,0.9);
     opacity: 0;
-    transition: opacity 0.3s ease-in-out, top 0.3s ease-in-out;
+    transition: opacity 0.25s, top 0.25s;
+    z-index: 30;
 }
-.warn-panel.show {
-    top: 55%;
-    opacity: 1;
+.warn-panel.show { top: 55%; opacity: 1; }
+
+/* ========== PARTY, TARGET MENÜ, BUFFS ========== */
+
+#partyPanel {
+    position: absolute;
+    top: 18px;
+    right: 210px;
+    min-width: 160px;
+    padding: 8px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 8px;
+    border: 1px solid #330000;
+    box-shadow: 0 0 14px rgba(255,0,0,0.4);
+    pointer-events: auto;
+    font-size: 12px;
+    z-index: 6;
 }
 
-/* --- LOGIN EKRANI STİLİ --- */
-#loginScreen {
-    width: 500px; /* Karakter oluşturmadan biraz daha dar */
-    margin: 0 auto;
-    background-color: #1a1a1a;
-    /* GELİŞTİRİLDİ: Başlangıç ekranı için farklı bir arka plan/doku */
-    background-image: url('/assets/login_bg_pattern.png'); /* Opsiyonel: Koyu bir desen */
-    background-size: cover;
-    border: 4px solid #4a148c; /* Mor/Mavi tonlarında bir çerçeve */
-    border-radius: 10px;
-    padding: 30px;
-    box-shadow: 0 0 25px rgba(74, 20, 140, 0.7);
+#partyMemberList {
+    max-height: 120px;
+    overflow-y: auto;
+    margin-bottom: 6px;
+}
+
+#targetPlayerMenu {
     position: absolute;
-    top: 50%;
+    top: 40%;
     left: 50%;
     transform: translate(-50%, -50%);
-    z-index: 101; /* creationScreen'den bir tık daha yüksek */
+    width: 220px;
+    z-index: 14;
+}
+#targetPlayerActions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+}
+
+#buffsPanel {
+    position: absolute;
+    top: 18px;
+    left: 260px;
+    display: flex;
+    gap: 6px;
+    z-index: 6;
     pointer-events: auto;
-    text-align: center;
+}
+#buffsPanel .buff-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    background: radial-gradient(circle at center, #222, #000);
+    border: 1px solid #770000;
+    box-shadow: 0 0 10px rgba(255,0,0,0.5);
 }
 
-#loginScreen h1 {
-    color: #9c27b0; /* Menekşe rengi başlık */
-    text-shadow: 2px 2px 0px #000, 0 0 15px rgba(156, 39, 176, 0.6);
-    margin-bottom: 25px;
-}
+/* ========== SKILL CHOICE WINDOW (Lv5) ========== */
 
-#accountNameInput, #passwordInput, #registerPasswordConfirm {
-    padding: 12px;
-    font-size: 17px;
-    background-color: #000;
-    border: 2px solid #555;
-    color: #fff;
-    border-radius: 8px;
-    width: 80%;
-    text-align: center;
-    margin-bottom: 10px;
-    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
-}
-
-#loginBtn {
-    padding: 15px 30px;
-    font-size: 20px;
-    background: linear-gradient(180deg, #673AB7, #4527A0); /* Mor tonları */
-    border: 4px solid #EDE7F6;
-    color: #fff;
-    cursor: pointer;
+.skill-choice-panel {
+    position: absolute;
+    top: 52%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 420px;
+    padding: 18px;
+    background: radial-gradient(circle at top, #181818, #050505);
     border-radius: 10px;
-    font-weight: bold;
+    border: 3px solid #770000;
+    box-shadow: 0 0 32px rgba(255,0,0,0.8);
+    text-align: center;
+    z-index: 25;
+    pointer-events: auto;
+}
+#skillChoiceButtons {
     margin-top: 10px;
-    text-shadow: 2px 2px 3px #000;
-    box-shadow: 0 5px 15px rgba(103, 58, 183, 0.7);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-#loginBtn:hover {
-    background: linear-gradient(180deg, #7E57C2, #5E35B1);
-    box-shadow: 0 0 20px rgba(103, 58, 183, 1);
-}
+/* ========== BLACKSMITH / UPGRADE PANEL ========== */
 
-#showRegisterBtn, #registerBtn {
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #333;
-    border: 2px solid #666;
-    color: #eee;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: bold;
-    box-shadow: 0 3px 5px rgba(0,0,0,0.5);
-}
-
-#showRegisterBtn:hover, #registerBtn:hover {
-    background-color: #555;
-    border-color: #999;
-}
-
-#registerForm {
-    padding: 15px;
-    border-top: 2px dashed #4a148c;
-    margin-top: 20px;
-}
-
-/* style.css (dosyanın sonuna ekle) */
 #blacksmithPanel {
-    width: 350px;
+    position: absolute;
+    top: 52%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 360px;
+    z-index: 13;
 }
-
 #upgradeInterface {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 15px;
+    padding: 12px;
     text-align: center;
+    gap: 10px;
 }
-
-#upgradeInterface p {
-    font-size: 13px;
-    color: #ccc;
-    margin-bottom: 15px;
-}
-
 #upgradeSlot {
-    width: 60px;
-    height: 60px;
-    border: 2px dashed #555;
-    background-color: rgba(0, 0, 0, 0.3);
-    margin-bottom: 20px;
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    border: 2px dashed #666;
+    background: rgba(0,0,0,0.5);
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 6px;
 }
-
 #upgradeSlot.occupied {
     border-style: solid;
-    border-color: #888;
-    background-color: rgba(0, 0, 0, 0.5);
+    border-color: #bbb;
+    background: rgba(0,0,0,0.7);
 }
-
 #upgradeSlot img {
     width: 100%;
     height: 100%;
     object-fit: contain;
 }
-
 #upgradeInfo {
-    font-size: 14px;
-    margin-bottom: 20px;
-    color: #eee;
     width: 100%;
     text-align: left;
-    padding-left: 20px;
+    font-size: 12px;
+    color: #eee;
 }
-
-#upgradeInfo div {
-    margin-bottom: 8px;
-}
-
+#upgradeInfo div { margin-bottom: 4px; }
 #upgradeButton {
     width: 80%;
-    padding: 12px;
-    font-size: 16px;
-    font-weight: bold;
-}
-
-/* style.css (dosyanın sonuna eklenecek) */
-
-.item-plus {
-    position: absolute;
-    bottom: 0px; /* Alttan 0 piksel */
-    right: 2px;  /* Sağdan 2 piksel */
-    background-color: rgba(0, 0, 0, 0.7); /* Hafif şeffaf arka plan */
-    color: #ffcc00; /* Altın rengi yazı */
-    font-size: 10px; /* Küçük font */
-    font-weight: bold;
-    padding: 1px 4px;
-    border-radius: 3px;
-    line-height: 1; /* Metnin dikey hizalamasını düzeltir */
-    pointer-events: none; /* Tooltipin arkasında kalmasını sağlar */
-    border: 1px solid rgba(255, 204, 0, 0.3); /* Hafif parlak kenar */
-}
-
-#chatContainer {
-    position: absolute;
-    bottom: 100px; /* Aksiyon çubuğunun üstü */
-    left: 20px;
-    width: 400px;
-    height: 200px;
-    background-color: rgba(0, 0, 0, 0.4);
-    border: 1px solid #444;
-    border-radius: 5px;
-    display: flex;
-    flex-direction: column;
-    pointer-events: auto; /* Tıklanabilirlik */
-    font-size: 14px;
-    transition: background-color 0.3s;
-}
-
-#chatMessages {
-    flex-grow: 1;
-    overflow-y: auto; /* Kaydırma çubuğu */
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-/* Kaydırma çubuğu stili (opsiyonel) */
-#chatMessages::-webkit-scrollbar { width: 8px; }
-#chatMessages::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-#chatMessages::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
-
-.chat-msg {
-    color: #f0e6d2; /* Kirli beyaz */
-    line-height: 1.4;
-    text-shadow: 1px 1px 1px #000;
-}
-.chat-msg.system { color: #FFD700; font-style: italic; } /* Sistem mesajları (sarı) */
-.chat-msg.error { color: #FF4444; font-weight: bold; } /* Hata mesajları (kırmızı) */
-/* (Gelecekte eklenecek: .party, .guild) */
-
-#chatInput {
-    border: none;
-    border-top: 1px solid #444;
-    background-color: rgba(0, 0, 0, 0.6);
-    color: #fff;
-    padding: 10px;
-    outline: none;
-}
-
-#chatInput:focus {
-    background-color: rgba(0, 0, 0, 0.9);
-}
-
-#targetPlayerMenu {
-    /* Diğer panellerin (Karakter, Envanter) top: 50% ayarını ezer */
-    top: 20px !important; 
-    left: 50% !important;
-    transform: translate(-50%, 0) !important; /* Sadece yatayda ortala */
-    width: 380px; /* Diğer panellerle tutarlı genişlik */
-    z-index: 1001; /* Diğer her şeyin üstünde görünsün */
-}
-
-#targetPlayerActions {
-    display: flex;
-    justify-content: space-around; /* Butonları eşit aralıkla dağıt */
-    padding: 15px;
-}
-
-/* Butonları renklendirelim (buy-btn mavisini ezer) */
-#targetActionWhisper { background-color: #0055aa; border-color: #3388dd; }
-#targetActionInvite { background-color: #00aa55; border-color: #33dd88; }
-#targetActionTrade  { background-color: #aa0055; border-color: #dd3388; }
-
-#targetActionWhisper:hover { background-color: #0066cc; }
-#targetActionInvite:hover { background-color: #00cc66; }
-#targetActionTrade:hover  { background-color: #cc0066; }
-
-.chat-msg.whisper {
-    color: #E0B0FF; /* Açık Mor/Eflatun */
-    font-style: italic;
-    background-color: rgba(100, 50, 150, 0.1); /* Hafif mor arka plan */
-}
-
-#partyInvitePanel {
-    /* Ana panel grubundan (skill-panel, vb.) stilleri miras alır */
-    width: 350px;
-    z-index: 1002; /* Hedef menüsünün bile üstünde */
-}
-
-/* 2. Ana Parti Paneli (Sol Üst) */
-#partyPanel {
-    position: absolute;
-    top: 240px; /* playerStats'ın hemen altına */
-    left: 20px;
-    width: 200px;
-    background: rgba(10, 10, 10, 0.95);
-    border: 4px solid #6b471c;
-    border-image: linear-gradient(to bottom, #DAA520, #6b471c) 1;
-    border-radius: 8px;
-    padding: 10px;
-    pointer-events: auto;
-    z-index: 10;
-    box-shadow: 0 0 15px rgba(0,0,0,0.8); /* Parti paneline gölge ekle */
-}
-
-#partyMemberList {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-.party-member {
-    background-color: rgba(0, 0, 0, 0.3);
-    padding: 5px;
-    border-radius: 4px;
-    border: 1px solid #333;
-}
-
-.party-member-name {
-    font-size: 13px;
-    font-weight: bold;
-    color: #FFD700; /* Liderin rengi */
-}
-
-.party-member.normal .party-member-name {
-    color: #f0e6d2; /* Üyenin rengi */
-}
-
-.party-member-bar {
-    width: 100%;
-    height: 8px;
-    background: #111;
-    border: 1px solid #333;
-    border-radius: 4px;
-    overflow: hidden;
     margin-top: 4px;
-}
-
-.party-member-bar .hp {
-    background: linear-gradient(90deg, #b00000, #ff2222);
-    height: 100%;
-    transition: width 0.5s;
-}
-
-#partyControls button {
-    width: 100%;
-    padding: 5px;
-    font-size: 12px;
-    background-color: #aa0055;
-    border: 1px solid #ff3388;
-}
-
-/* Parti üyesi üzerindeki 'At' butonu */
-.party-kick-btn {
-    float: right;
-    width: 18px; height: 18px;
-    font-size: 10px; line-height: 16px;
-    background: #800; border: 1px solid #F00;
-    color: white; border-radius: 50%;
-    padding: 0;
-    cursor: pointer;
-}
-
-/* --- TİCARET PANELLERİ --- */
-
-/* Ticaret Penceresi Ana Konteyneri (TradePanel'in boyutları HTML'de belirtilmeli!) */
-#tradePanel {
-    /* Genel Panel Stillerinden alıyor */
-    width: 650px !important; /* Daha geniş bir ticaret paneli */
-    height: 480px !important; /* Daha uzun bir ticaret paneli */
-}
-
-.trade-container {
-    display: flex;
-    justify-content: space-between;
-    padding: 15px;
-    height: calc(100% - 70px); /* Başlık ve footer hariç */
-    gap: 15px;
-}
-
-.trade-side {
-    width: 49%; /* Boşluk için yer bırak */
-    border: 3px solid #6b471c; /* Kahverengi çerçeve */
-    background: rgba(0, 0, 0, 0.5); /* Koyu arkaplan */
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
-}
-
-.trade-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 10px;
-    background: linear-gradient(90deg, #333, #222);
-    border-bottom: 2px solid #6b471c;
-    border-radius: 5px 5px 0 0;
-}
-
-.trade-header span {
     font-weight: bold;
-    color: #FFD700; /* Altın renkli isimler */
-    text-shadow: 1px 1px 1px #000;
-}
-
-/* Ticaret Onay Durumu (Yeşil/Kırmızı) */
-.trade-status {
-    width: 25px;
-    height: 25px;
-    border-radius: 50%;
-    background-color: #8B0000; /* Kırmızı (Onaylanmadı) */
-    border: 2px solid #ff0000;
-    box-shadow: 0 0 8px #ff0000;
-    transition: all 0.3s ease;
-}
-
-.trade-status.locked {
-    background-color: #006400; /* Yeşil (Onaylandı) */
-    border: 2px solid #00ff00;
-    box-shadow: 0 0 8px #00ff00;
-}
-
-/* Ticaret Slot Izgarası */
-.trade-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr); /* 4 sütun daha sıkı yerleşim */
-    gap: 6px;
-    padding: 10px;
-    flex-grow: 1;
-    overflow-y: auto;
-}
-
-.trade-slot {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    /* Envanter slotlarıyla tutarlı bir görünüm */
-    background: radial-gradient(circle at center, #303030 0%, #181818 100%);
-    border: 2px solid #444;
-    border-radius: 6px;
-    box-sizing: border-box; 
-    position: relative; 
-    box-shadow: inset 0 0 8px rgba(0,0,0,1);
-    transition: border-color 0.2s;
-}
-
-.trade-slot img {
-    width: 90%;
-    height: 90%;
-    object-fit: contain;
-    image-rendering: pixelated;
-}
-
-.trade-slot:hover {
-    border-color: #FFD700;
-}
-
-/* Yang Alanı */
-.trade-yang {
-    padding: 10px;
-    border-top: 2px solid #6b471c;
-    text-align: right;
-    background: rgba(0, 0, 0, 0.4);
-}
-
-.trade-yang label {
-    font-size: 14px;
-    color: #f0e6d2;
-    margin-right: 5px;
-}
-
-.trade-yang input {
-    width: 130px;
-    background: #111;
-    color: #00ff00; /* Yeşil yang yazısı */
-    border: 1px solid #777;
-    padding: 4px 8px;
-    border-radius: 4px;
-    text-align: right;
-    font-weight: bold;
-    box-shadow: inset 0 0 5px rgba(0, 255, 0, 0.2);
-}
-
-/* Footer (Onay Butonu) */
-.trade-footer {
-    border-top: 3px solid #6b471c;
-    padding: 10px 15px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: linear-gradient(90deg, #332200, #443311);
-    border-radius: 0 0 5px 5px;
-}
-
-#tradeAcceptBtn {
-    background: linear-gradient(180deg, #4CAF50, #2E8B57);
-    border: 3px solid #7CFC00;
-    color: white;
-    font-size: 18px;
-}
-#tradeAcceptBtn:hover {
-    background: linear-gradient(180deg, #66BB6A, #3CB371);
-}
-
-/* Envanterde ticarete konulan eşyayı gri yap */
-.inv-slot.in-trade {
-    background-color: #333;
-    opacity: 0.5;
-    border-color: #222 !important;
-    transform: none !important;
-    box-shadow: inset 0 0 10px rgba(0,0,0,2) !important;
-}
-.inv-slot.in-trade img {
-    filter: grayscale(100%);
-}
-
-#tradeRequestPanel .panel-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    padding: 10px 0 20px 0;
-}
-#tradeRequestAccept {
-    background: linear-gradient(180deg, #4CAF50, #2E8B57);
-    border-color: #7CFC00;
-}
-#tradeRequestDecline {
-    background: linear-gradient(180deg, #ff2222, #a00);
-    border-color: #ff7777;
-}
-
-/* --- PARTİ SOHBETİ RENGİ --- */
-.chat-msg.party {
-    color: #87CEEB; /* Açık gök mavisi */
-    font-weight: bold;
-    font-style: italic;
-    background-color: rgba(50, 150, 250, 0.08); /* Hafif mavi arka plan */
 }

@@ -46,28 +46,37 @@
 <div id="creationScreen" class="hidden">
     <h1>Karakter Oluştur</h1>
     
-    <div class="choice-block">
-        <h3>Karakter Adı</h3>
-        <input type="text" id="playerNameInput" placeholder="Karakter adınızı girin...">
-    </div>
+    <div class="creation-content">
+        <div class="creation-left-side">
+             <div class="choice-block">
+                <h3>Karakter Adı</h3>
+                <input type="text" id="playerNameInput" placeholder="Karakter adınızı girin...">
+            </div>
 
-    <div class="choice-block">
-        <h3>Krallık Seç</h3>
-        <div class="button-group" id="kingdomSelection">
-            <button class="choice-btn" data-kingdom="shinsoo">Shinsoo</button>
-            <button class="choice-btn" data-kingdom="jinno">Jinno</button>
-            <button class="choice-btn" data-kingdom="chunjo">Chunjo</button>
+            <div class="choice-block">
+                <h3>Krallık Seç</h3>
+                <div class="button-group" id="kingdomSelection">
+                    <button class="choice-btn" data-kingdom="shinsoo">Shinsoo</button>
+                    <button class="choice-btn" data-kingdom="jinno">Jinno</button>
+                    <button class="choice-btn" data-kingdom="chunjo">Chunjo</button>
+                </div>
+            </div>
+            
+            <div class="choice-block">
+                <h3>Sınıf Seç</h3>
+                <div class="button-group" id="classSelection">
+                    <button class="choice-btn" data-class="warrior">Savaşçı</button>
+                    <button class="choice-btn" data-class="ninja">Ninja</button>
+                    <button class="choice-btn" data-class="sura">Sura</button>
+                    <button class="choice-btn" data-class="shaman">Şaman</button>
+                    <button class="choice-btn" data-class="lycan">Lycan</button>
+                </div>
+            </div>
         </div>
-    </div>
-    
-    <div class="choice-block">
-        <h3>Sınıf Seç</h3>
-        <div class="button-group" id="classSelection">
-            <button class="choice-btn" data-class="warrior">Savaşçı</button>
-            <button class="choice-btn" data-class="ninja">Ninja</button>
-            <button class="choice-btn" data-class="sura">Sura</button>
-            <button class="choice-btn" data-class="shaman">Şaman</button>
-            <button class="choice-btn" data-class="lycan">Lycan</button>
+        
+        <div class="creation-right-side">
+            <img id="classPreviewImage" src="/assets/default_preview.png" style="display: block;">
+            <p style="color: #FFD700; font-weight: bold;">Seçimini yap!</p>
         </div>
     </div>
 

@@ -98,7 +98,7 @@ const POT_COOLDOWN_DURATION = 1000;
 // --- YENİ/GÜNCEL DEĞİŞKENLER ---
 let inputListenersInitialized = false; 
 let selectedCharacterName = null; // KRİTİK: Seçilen karakter adını tutar
-const MAX_CHAR_SLOTS = 2;
+const MAX_CHAR_SLOTS = 5;
 // --- YENİ KOD SONU ---
 
 // --------------------------- PLAYER STATS ---------------------------
@@ -704,9 +704,17 @@ classSelection.addEventListener("click", (e) => {
         classSelection.querySelectorAll("button").forEach(b => b.classList.remove("selected"));
         e.target.classList.add("selected");
         playerChoices.class = e.target.dataset.class; 
+        
+        // --- YENİ EKLENTİ: ÖNİZLEME GÜNCELLEMESİ ---
+        const selectedClass = playerChoices.class;
+        if (classPreviewImage && selectedClass) {
+            // Örn: assets/warrior_preview.png dosyasını kullan (bu görselin assets klasöründe mevcut olduğunu varsayıyoruz)
+            classPreviewImage.src = `/assets/${selectedClass}_preview.png`;
+            classPreviewImage.style.display = 'block';
+        }
+        // --- EKLENTİ SONU ---
     }
 });
-
 
 // --------------------------- OYUN MOTORU ---------------------------
 function resizeCanvas() {
@@ -1714,6 +1722,7 @@ function resetUpgradeSlot() {
 
 
     // --- YENİ: TİCARET DAVET BUTONLARI (BURAYA EKLE) ---
+    // --- YENİ: TİCARET DAVET BUTONLARI (BURAYA EKLE) ---
     if (tradeRequestAccept) {
         tradeRequestAccept.onclick = () => {
             if (currentTradeRequesterId) {
@@ -1731,7 +1740,7 @@ function resetUpgradeSlot() {
             }
         };
     }
-    }
+}
 
 
 // Demirci paneli eventlerini (sürükle-bırak, tıkla) ayarlar
@@ -1944,36 +1953,58 @@ function showWarnPanel(message) {
 // --- KARAKTER SEÇİM EKRANI MANTIĞI ---
 
 function renderCharacterSelectionScreen(characters) {
+    // KRİTİK: Karakter Önizleme Alanını da Temizle
+    const classPreviewImage = document.getElementById("classPreviewImage");
+    if(classPreviewImage) {
+        classPreviewImage.src = "/assets/default_preview.png"; // Varsayılan görseli göster
+    }
+    
     characterListEl.innerHTML = ""; 
-    selectedCharacterName = null; // KRİTİK: Seçim ekranı açılınca sıfırlanır.
+    selectedCharacterName = null; 
 
+    // MAX_CHAR_SLOTS'un 5'e güncellendiğini varsayıyoruz
     document.getElementById("charSlotCount").textContent = `${characters.length}/${MAX_CHAR_SLOTS}`;
     selectCharBtn.disabled = true;
     
     // 1. Var olan karakterleri listele
-    characters.forEach(charName => {
-        // Sunucudan gelen karakter listesi sadece isim içerdiği için client'taki localStorage'a dayanmak risklidir.
-        // Şimdilik sadece isim gösterilir, level/sınıf sunucudan gelene kadar '?' kalır.
-        const charData = JSON.parse(localStorage.getItem(`char_${charName}`)) || {};
+    // characters ARTIK: [{ name: '...', class: '...', level: X }, ...] formatındadır.
+    characters.forEach(charData => {
+        const charName = charData.name;
+        // KRİTİK DÜZELTME: class ve level için varsayılan değer kullan
+        const charClass = charData.class || 'default'; 
+        const charLevel = charData.level || 1;
+        
+        // Sınıf görseli yolu (Hata durumunda default_icon.png kullanır)
+        const iconPath = `/assets/${charClass}_icon.png`; 
         
         const btn = document.createElement("button");
         btn.className = "choice-btn character-card";
-        btn.textContent = `${charName} (Lv. ${charData.level || '?'}, ${charData.class || '?'})`;
         btn.dataset.name = charName;
         
+        btn.innerHTML = `
+            <img src="${iconPath}" 
+                 onerror="this.onerror=null; this.src='/assets/default_icon.png';" 
+                 alt="${charClass}" 
+                 class="char-icon">
+            <div class="char-info">
+                <div class="char-name">${charName}</div>
+                <div class="char-details">Lv. ${charLevel} | ${charClass.toUpperCase()}</div>
+            </div>
+        `;
+
         btn.onclick = (e) => {
             characterListEl.querySelectorAll(".character-card").forEach(b => b.classList.remove("selected"));
-            e.target.classList.add("selected");
             
-            // KRİTİK: Seçilen karakteri kaydet
+            const targetButton = e.currentTarget; 
+            targetButton.classList.add("selected");
+            
             selectedCharacterName = charName; 
-            
             selectCharBtn.disabled = false;
         };
         characterListEl.appendChild(btn);
     });
 
-    // 2. Slot limitini kontrol et
+    // 2. Slot limitini kontrol et (Yeni Karakter Slotu butonu)
     if (characters.length < MAX_CHAR_SLOTS) {
         const newCharBtn = document.createElement("button");
         newCharBtn.className = "choice-btn new-char-slot";
@@ -1990,7 +2021,6 @@ function renderCharacterSelectionScreen(characters) {
          createCharBtn.disabled = true;
     }
 }
-
 
 // --- GİRİŞ/SEÇİM BUTON DİNLEYİCİLERİ ---
 
@@ -2240,26 +2270,27 @@ function setupChatListener() {
 
 // client.js
 function setupInputListeners() {
+    // KRİTİK KONTROL: Eğer zaten kurulduysa tekrar kurma!
     if (inputListenersInitialized) {
         console.warn("Input listener'lar zaten kurulmuş. Tekrar kurma engellendi.");
-        return;
+        return; 
     }
     
+    // YALNIZCA BURADA true yap
     inputListenersInitialized = true; 
 
     canvas.addEventListener("click", handleWorldClick);
     
     window.addEventListener("keydown", (e) => {
         const me = players[mySocketId];
-        const key = e.key.toLowerCase(); // Tuşu en başta alalım
+        const key = e.key.toLowerCase(); 
 
         // =================================================================
-        // ### ESC TUŞU MANTIĞI ###
+        // ESC TUŞU MANTIĞI: Tüm açık panelleri kapatma sırası
         // =================================================================
         if (key === 'escape') {
-            e.preventDefault(); // Varsayılan ESC eylemlerini engelle
+            e.preventDefault(); 
             
-            // 1. Öncelik: Sohbetten çık
             if (document.activeElement === chatInput) {
                 chatInput.blur();
                 return;
@@ -2269,53 +2300,37 @@ function setupInputListeners() {
                 closePartyInvite();
                 return;
             }
-            
-            
-            // 2. Öncelik: Açık panelleri kapat (birini bulduğu an durur)
-            // (NOT: Bu elementlerin en üstte tanımlı olması gerekir)
-            if (skillChoiceWindow && !skillChoiceWindow.classList.contains("hidden")) {
-                skillChoiceWindow.classList.add("hidden");
-                return;
-            }
-            if (blacksmithPanel && !blacksmithPanel.classList.contains("hidden")) {
-                closeBlacksmithWindow(); // Demirci'nin özel kapatma fonksiyonu var
-                return;
-            }
-            if (shopPanel && !shopPanel.classList.contains("hidden")) {
-                shopPanel.classList.add("hidden");
-                return;
-            }
-            if (inventoryPanel && !inventoryPanel.classList.contains("hidden")) {
-                inventoryPanel.classList.add("hidden");
-                return;
-            }
-            if (characterPanel && !characterPanel.classList.contains("hidden")) {
-                characterPanel.classList.add("hidden");
-                return;
-            }
-            if (skillPanel && !skillPanel.classList.contains("hidden")) {
-                skillPanel.classList.add("hidden");
+            if (tradeRequestPanel && !tradeRequestPanel.classList.contains("hidden")) {
+                closeTradeRequest();
                 return;
             }
             
-            return; // ESC başka bir işlev yapmasın
+            // Tüm oyun panellerini sırayla kapatma
+            const panels = [skillChoiceWindow, blacksmithPanel, shopPanel, inventoryPanel, characterPanel, skillPanel, tradePanel];
+            for(const panel of panels) {
+                 if (panel && !panel.classList.contains("hidden")) {
+                    if (panel === blacksmithPanel) { closeBlacksmithWindow(); } 
+                    else if (panel === tradePanel) { closeTradeWindow(); } // Ticareti güvenli kapatma
+                    else { panel.classList.add("hidden"); }
+                    return;
+                }
+            }
+            return;
         }
         // =================================================================
 
 
-        // Enter'a basıldığında ve chat kutusu odaklı DEĞİLSE (Sohbete odaklan)
         if (key === 'enter' && document.activeElement !== chatInput) {
             e.preventDefault(); 
             chatInput.focus(); 
             return; 
         }
         
-        // Eğer odak chatInput'taysa, hiçbir oyun tuşunu çalıştırma
         if (document.activeElement === chatInput) {
             return;
         }
         
-        // --- Buradan sonrası oyun mekanikleri (Hareket, Beceri vb.) ---
+        // --- Buradan sonrası oyun mekanikleri ---
         
         if (!me || !me.isAlive) { e.preventDefault(); return; }
         if (e.target.tagName === 'INPUT') return;
@@ -2332,16 +2347,11 @@ function setupInputListeners() {
             e.preventDefault();
         }
 
-        // =======================================================
-        // ### DÜZELTME: EKSİK KISAYOL KODU ###
-        // =======================================================
+        // Kısayol Tuşları (1-6)
         if (ACTION_SLOT_KEYS.includes(key)) {
-            handleSkillUse(key); // Fonksiyonu çağır
+            handleSkillUse(key); 
             e.preventDefault();
         }
-        // =======================================================
-        // ### DÜZELTME SONU ###
-        // =======================================================
 
        // Panel tuşları
        if (key === 'i') {
@@ -2351,9 +2361,8 @@ function setupInputListeners() {
             e.preventDefault();
         }
         if (key === 'k') {
-            if (skillPanel) { // <-- DEĞİŞTİ
+            if (skillPanel) { 
                 skillPanel.classList.toggle("hidden");
-                // Panel açılıyorsa UI'ı güncelle
                 if (!skillPanel.classList.contains("hidden")) { 
                     updateSkillPanelUI();
                 }
@@ -2361,9 +2370,8 @@ function setupInputListeners() {
             e.preventDefault();
         }
         if (key === 'c') {
-            if (characterPanel) { // <-- DEĞİŞTİ
+            if (characterPanel) {
                 characterPanel.classList.toggle("hidden");
-                // Panel açılıyorsa UI'ı güncelle
                 if (!characterPanel.classList.contains("hidden")) { 
                     updateCharacterPanelUI();
                 }
@@ -2372,49 +2380,30 @@ function setupInputListeners() {
         }
     });
 
-    // =================================================================
-    // ### YENİ EKLENEN 'keyup' DİNLEYİCİSİ (Yürüme Hatası Düzeltmesi) ###
-    // =================================================================
+    // KRİTİK: Tuş Bırakma Dinleyicisi (Karakterin Takılı Kalmasını Engeller)
     window.addEventListener("keyup", (e) => {
         const key = e.key.toLowerCase();
         
-        // 1. Önce, bırakılan tuşun bir hareket tuşu olup olmadığını kontrol et.
         if (keysPressed[key] !== undefined) {
-            
-            // Eğer bir hareket tuşuysa ('w', 'a', 's', 'd'),
-            // odak nerede olursa olsun (sohbette bile olsak)
-            // 'pressed' durumunu 'false' yap ve sunucuya bildir.
-            // Bu, karakterin takılı kalmasını engeller.
-            
             keysPressed[key] = false;
             socket.emit("keyStateChange", { key, pressed: false });
         }
 
-        // 2. Artık 'INPUT' kontrolünü yapabiliriz.
-        // Eğer odak bir 'INPUT' içindeyse, (hareket tuşları dışındaki)
-        // başka bir 'keyup' eylemini engelle.
         if (e.target.tagName === 'INPUT') {
             return;
         }
     });
-    // =================================================================
-    // ### YENİ 'keyup' DİNLEYİİSİ SONU ###
-    // =================================================================
 
     // Diğer dinleyicileri ayarla
-    setupBlacksmithListeners(); // Demirci panelini ayarla
-    setupChatListener(); // Sohbet girişini (Enter) ayarla
+    setupBlacksmithListeners(); 
+    setupChatListener(); 
 
-    // Panel kapatma butonları
+    // Panel kapatma butonları (Tanımlanmışlarsa)
     const skillPanelCloseBtn = document.getElementById("skillPanelCloseBtn");
-    if(skillPanelCloseBtn) {
-        skillPanelCloseBtn.onclick = toggleSkillPanel;
-    }
+    if(skillPanelCloseBtn) skillPanelCloseBtn.onclick = toggleSkillPanel;
 
     const charPanelCloseBtn = document.getElementById("characterPanelCloseBtn");
-    if(charPanelCloseBtn) {
-        charPanelCloseBtn.onclick = toggleCharacterPanel;
-    }
+    if(charPanelCloseBtn) charPanelCloseBtn.onclick = toggleCharacterPanel;
 
     const shopPanelCloseBtn = document.getElementById("shopPanelCloseBtn");
     if(shopPanelCloseBtn) {
@@ -2422,21 +2411,6 @@ function setupInputListeners() {
             document.getElementById("shopPanel").classList.add("hidden");
         };
     }
-
-    // Mağaza (Shop) Tab'ları
-    document.querySelectorAll(".shop-tabs .tab-btn").forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll(".shop-tabs .tab-btn").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".shop-tab").forEach(tab => tab.classList.add("hidden"));
-            
-            btn.classList.add("active");
-            document.getElementById(btn.dataset.tab + "Tab").classList.remove("hidden");
-            
-            if (btn.dataset.tab === 'sell') {
-                updateSellPanelUI();
-            }
-        };
-    });
 }
    
 // --------------------------- ANİMASYON (Aynı Kaldı) ---------------------------
@@ -2675,36 +2649,57 @@ function updateMinimap() {
 // --------------------------- ÇİZİM ---------------------------
 let gameLoopStarted = false;
 
+
+
 function draw() {
+    // KRİTİK 1: Oyun döngüsü başlamadıysa siyah ekranı göster
     if (!gameLoopStarted) {
-        ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height); return;
+        ctx.fillStyle = "black"; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height); 
+        return;
     }
     
     const me = players[mySocketId];
-    if (!me) {
-        ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height); return;
+    
+    // KRİTİK 2: Kendi oyuncu objemiz yoksa (ilk yükleme hatası), siyah ekranda kal
+    if (!me) { 
+        ctx.fillStyle = "black"; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height); 
+        return; 
     }
 
     const map = CLIENT_MAP_DATA[me.map];
     if (!map) return;
 
-    const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
-    const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
+    // YENİ DÜZELTME: Canvas'ın görüntülenebilir mantıksal boyutlarını garantile
+    // NOT: resizeCanvas() fonksiyonunun çalıştığından emin olun.
+    const scale = window.devicePixelRatio || 1;
+    const logicalWidth = canvas.width / scale;   // Canvas'ın CSS genişliği
+    const logicalHeight = canvas.height / scale; // Canvas'ın CSS yüksekliği
 
-    // Kamera
-    camera.x = Math.max(0, Math.min(me.x + me.width / 2 - logicalWidth / 2, map.width - logicalWidth));
-    camera.y = Math.max(0, Math.min(me.y + me.height / 2 - logicalHeight / 2, map.height - logicalHeight));
-
+    // KRİTİK 3: Kamera Takibi (Oyuncuyu ortalamak ve harita sınırlarında kalmak için)
+    // Eğer logicalWidth veya logicalHeight sıfır/çok küçük gelirse kamera hesaplaması bozulur.
+    
+    if (logicalWidth > 0 && logicalHeight > 0) {
+        camera.x = Math.max(0, Math.min(me.x + me.width / 2 - logicalWidth / 2, map.width - logicalWidth));
+        camera.y = Math.max(0, Math.min(me.y + me.height / 2 - logicalHeight / 2, map.height - logicalHeight));
+    } else {
+        // Eğer boyutlar hala sıfırsa (Hata), kamerayı haritanın başlangıcına sabitle
+        camera.x = 0;
+        camera.y = 0;
+    }
+    
+    // Ekranı temizle ve kamerayı uygula
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(-camera.x, -camera.y);
 
-    // HARİTA
+    // --- 1. HARİTA ÇİZİMİ ---
     const bg = loadedImages[map.src];
     if (bg) ctx.drawImage(bg, 0, 0, map.width, map.height);
 
-    // PORTAL ALANLARI (mavi-yarı saydam kare)
+    // PORTAL ALANLARI (Mavi-yarı saydam kare)
     ctx.fillStyle = "rgba(0, 150, 255, 0.3)";
     ctx.strokeStyle = "#00AAFF";
     ctx.lineWidth = 2;
@@ -2715,44 +2710,44 @@ function draw() {
         ctx.strokeRect(p.x - w/2, p.y - h/2, w, h);
     });
 
-    // MOBLAR
+    // --- 2. MOBLAR VE METİNLER ---
+    const now = Date.now();
+    const MOB_RESPAWN_TIME = 10000; // Sunucudaki 10 saniyeyi burada da kullan
+
     for (const id in mobs) {
         const mob = mobs[id];
         if (mob.map !== me.map) continue;
         
         const mobId = `mob_${id}`;
         const mobAnimData = animData[mobId]; 
-        
         const mobAsset = mob.asset ? assetDefinitions[mob.asset] : null;
 
-        // YENİ: Ölüm animasyonu ve 2 saniye bekleme
+        // KRİTİK: Ölüm/Respawn Animasyonu
         let isFadingOut = false;
         if (!mob.isAlive) {
-            const now = Date.now();
-            const deathTime = mob.deathTime || (now - MOB_RESPAWN_TIME); 
+            const deathTime = mob.deathTime || now; 
             const timeSinceDeath = now - deathTime;
 
             if (timeSinceDeath > 2000) {
-                continue;
+                continue; // 2 saniye geçtikten sonra çizimi durdur
             }
             
+            // 2 saniye boyunca saydamlaşarak kaybolma
             isFadingOut = true;
             ctx.globalAlpha = 1.0 - (timeSinceDeath / 2000);
         }
-        // --- YENİ KOD SONU ---
 
-        
-        // --- YENİ: METİN TAŞI HP/İSİM ÇİZİMİ ---
+        // --- Metin Taşı Çizimi ---
         if (mob.isMetin) {
             const hpPercent = (mob.hp / mob.maxHp) * 100;
-            const barWidth = 100; // Metin için sabit bar genişliği
+            const barWidth = 100; 
             const barX = mob.x + (mob.width / 2) - (barWidth / 2);
             const barY = mob.y - 25; 
             
-            // Metin HP Barı (Mor)
+            // HP Barı (Mor)
             ctx.fillStyle = "#3a0050"; 
             ctx.fillRect(barX, barY, barWidth, 6);
-            ctx.fillStyle = "#8B00FF"; // Can dolduran mor renk
+            ctx.fillStyle = "#8B00FF";
             ctx.fillRect(barX, barY, (barWidth * hpPercent) / 100, 6);
             
             // Kalan Mob Hakkı Çizgileri
@@ -2772,59 +2767,51 @@ function draw() {
             ctx.textAlign = "center";
             ctx.fillText(`${mob.type} Lv.${mob.level}`, mob.x + mob.width / 2, mob.y - 10);
         }
-        // --- METİN ÇİZİM SONU ---
 
-
+        // --- Mob Varlık Çizimi (Normal Moblar ve Metin) ---
         if (mobAsset) {
             
             const currentStateKey = mob.animState || "idle";
-            
             if (!mobAnimData) continue; 
             
+            // Varlık bulma mantığı
             const isSingleSheet = !!mobAsset.animations; 
-            
             let state;
             let img;
             let sourceSheetRow = 0; 
 
             if (isSingleSheet) {
-                const animConfig = mobAsset.animations[currentStateKey];
-                if (!animConfig) continue;
-                
-                state = mobAsset; 
-                img = loadedImages[mobAsset.src];
-
-                sourceSheetRow = directionRowMap[mob.direction] || 0;
-                sourceSheetRow += (animConfig.rowOffset || 0); 
-                
-                var frameX = animConfig.startFrameX * state.frameWidth; 
-                frameX += mobAnimData.animFrame * state.frameWidth;
-
+                 const animConfig = mobAsset.animations[currentStateKey];
+                 if (!animConfig) continue;
+                 state = mobAsset; 
+                 img = loadedImages[mobAsset.src];
+                 sourceSheetRow = directionRowMap[mob.direction] || 0;
+                 sourceSheetRow += (animConfig.rowOffset || 0); 
             } else {
-                state = mobAsset[currentStateKey] || mobAsset["idle"];
-                img = loadedImages[state.src];
-                sourceSheetRow = directionRowMap[mob.direction] || 0;
-                
-                var frameX = mobAnimData.animFrame * state.frameWidth;
+                 state = mobAsset[currentStateKey] || mobAsset["idle"];
+                 img = loadedImages[state.src];
+                 sourceSheetRow = directionRowMap[mob.direction] || 0;
             }
 
             if (!state || !img) continue;
 
             const hitbox = mobAsset.hitbox;
-
-            if (currentStateKey === "hurt" && mobAnimData.hurtPlayed) {
-                 frameX = ((isSingleSheet ? mobAsset.animations.hurt.startFrameX : state.frames) - 1) * state.frameWidth;
+            let frameX = mobAnimData.animFrame * state.frameWidth;
+            
+            // Hurt animasyonu bitince son karede dondurma (Mob'lar için)
+            if (currentStateKey === "hurt" && mobAnimData.hurtPlayed && !isSingleSheet) {
+                 frameX = (state.frames - 1) * state.frameWidth;
             }
 
             const frameY = sourceSheetRow * state.frameHeight;
-            
             const drawX = mob.x + (mob.width / 2) - state.pivotX;
             const drawY = mob.y + (mob.height / 2) - state.pivotY;
 
+            // Çizim
             ctx.drawImage(img, frameX, frameY, state.frameWidth, state.frameHeight, 
                           drawX, drawY, state.frameWidth, state.frameHeight);
             
-            // Normal Moblar için HP Barı (Metin değilse)
+            // Normal Moblar için HP Barı
             if (!mob.isMetin) {
                 const hpPercent = (mob.hp / mob.maxHp) * 100;
                 const barWidth = hitbox.width * 1.5; 
@@ -2843,13 +2830,13 @@ function draw() {
             }
         }
         
-        // Eğer bu mob için saydamlık kullandıysak, bir sonrakine geçmeden sıfırla
+        // Saydamlık kullanıldıysa sıfırla
         if (isFadingOut) {
             ctx.globalAlpha = 1.0;
         }
     }
     
-    // NPC'ler
+    // --- 3. NPC'LER ---
     for (const id in npcs) {
         const p = npcs[id];
         if (p.map !== me.map) continue;
@@ -2884,11 +2871,12 @@ function draw() {
         ctx.fillText(p.name, p.x + p.width / 2, p.y - 10);
     }
     
-    // OYUNCULAR
+    // --- 4. OYUNCULAR ---
     for (const id in players) {
         const p = players[id];
         if (p.map !== me.map) continue;
         
+        // Ölü oyuncu için saydamlık
         if (!p.isAlive) { 
             ctx.globalAlpha = 0.5; 
         }
@@ -2909,6 +2897,7 @@ function draw() {
 
         const hitbox = classAsset.hitbox;
 
+        // Hasar aldıysa kısa süreli HP barı göster
         if (ad.prevHp === undefined) { ad.prevHp = p.hp; } 
         
         if (p.hp < ad.prevHp) { 
@@ -2922,6 +2911,7 @@ function draw() {
             const barX = p.x + (hitbox.width / 2) - (barWidth / 2); 
             const barY = p.y - 25; 
 
+            // HP Bar Çizimi
             ctx.fillStyle = "rgba(100, 0, 0, 0.7)";
             ctx.fillRect(barX, barY, barWidth, 6); 
             
@@ -2947,18 +2937,57 @@ function draw() {
 
         ctx.drawImage(img, frameX, frameY, state.frameWidth, state.frameHeight, drawX, drawY, state.frameWidth, state.frameHeight);
 
-        ctx.fillStyle = "white";
-        ctx.font = "12px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(p.name, p.x + hitbox.width / 2, p.y - 10);
+       // Oyuncu Adı ve Level Bilgisi (DÜZELTİLMİŞ)
+        
+        const nameX = p.x + hitbox.width / 2; // X koordinatı karakterin ortası
+        const nameY = p.y - 10;               // Y koordinatı: Karakterin hemen üstü
 
-      if (!p.isAlive) { 
-                ctx.globalAlpha = 1.0; 
-            }
+        // --- 1. GM Etiketi (Üstte) ---
+        if (p.isAdmin) {
+            ctx.fillStyle = "#FF4444"; // Kırmızı renk
+            ctx.font = "14px Arial";
+            ctx.textAlign = "center";
+            // İsimden biraz daha yukarıda çiz
+            ctx.fillText("[GM]", nameX, nameY - 15); 
         }
 
-    ctx.restore(); 
+        // --- 2. Level ve İsim (Altta) ---
+        
+        // Level bilgisini içeren metin
+        const levelText = `[Lv.${p.level}]`;
+        const levelWidth = ctx.measureText(levelText).width; // Level metninin genişliğini ölç
 
+        // İsim metni
+        const nameText = p.name;
+        
+        // Toplam Genişlik (GM etiketi yoksa Level ve İsim yan yana)
+        const totalWidth = levelWidth + ctx.measureText(nameText).width; 
+
+        // Level Metninin Başlangıç X Koordinatı
+        // nameX'ten (orta nokta) toplam genişliğin yarısı kadar sola kaydır
+        const levelStartX = nameX - (totalWidth / 2);
+        
+        // KRİTİK: Level Metnini Çiz
+        ctx.fillStyle = "#FFD700"; // Sarı renk (Level)
+        ctx.font = "12px Arial";
+        ctx.textAlign = "left"; // Metinleri soldan sağa çizmek için ayarla
+        ctx.fillText(levelText, levelStartX, nameY);
+        
+        // KRİTİK: İsim Metnini Çiz
+        ctx.fillStyle = "white"; // Beyaz renk (İsim)
+        // Level metninin hemen bitiminden başla
+        ctx.fillText(nameText, levelStartX + levelWidth + 2, nameY); // +2 boşluk
+        
+        // Tekrar ortalamayı ayarla (Sonraki çizimler için güvenlik)
+        ctx.textAlign = "center";
+
+        // Saydamlığı sıfırla
+        if (!p.isAlive) { 
+            ctx.globalAlpha = 1.0; 
+        }
+    }
+
+    ctx.restore(); 
 }
 
 // --------------------------- OYUN DÖNGÜSÜ ---------------------------
@@ -3112,19 +3141,21 @@ function hideAllScreensAndStartGame() {
     // 1. Tüm giriş/oluşturma/seçim ekranlarını gizle
     loginScreen.classList.add("hidden"); 
     creationScreen.classList.add("hidden"); 
-    characterSelectionScreen.classList.add("hidden"); // KRİTİK: Karakter seçim ekranı gizlenir.
+    characterSelectionScreen.classList.add("hidden"); 
     
     // 2. Oyun dünyasını göster
     gameWorld.classList.remove("hidden");   
 
     // 3. Oyunun başlatılması için gerekli adımları çağır
     setupUI(); 
+    // KRİTİK ÇAĞRI: Giriş dinleyicilerini kur!
     setupInputListeners(); 
     updateSkillBarUI();
     
     // 4. Grafikleri yükle ve ana oyun döngüsünü başlat
     initializeGameGraphics();
 }
+
 // SUNUCU ONAYI SONRASI OYUN BAŞLATMA
 socket.on("characterJoined", () => {
     // Merkezi başlatma fonksiyonunu çağır

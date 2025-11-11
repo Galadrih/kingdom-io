@@ -20,11 +20,40 @@ mongoose.connect(MONGO_URI)
 // const bcrypt = require('bcrypt');
 // const saltRounds = 10;
 
+const ADMIN_ACCOUNTS = [
+    "Galadrih",
+
+];
+
 // Eğer bcrypt kurmadıysanız, aşağıdaki basit (güvenli olmayan) şifre kontrolünü kullanın.
 // **UYARI: Gerçek bir oyunda bcrypt kullanmak zorunludur!**
 const hashPassword = (password) => password;
 const comparePassword = (password, hash) => password === hash;
 const playerToAccountMap = {}; // socket.id -> { username: '...', characterName: '...' }
+
+const PLAYER_CLASSES = {
+    warrior: {
+        baseStats: { vit: 10, str: 10, int: 5, dex: 5 },
+        name: "Savaşçı"
+    },
+    ninja: {
+        baseStats: { vit: 5, str: 5, int: 5, dex: 15 },
+        name: "Ninja"
+    },
+    sura: {
+        baseStats: { vit: 8, str: 8, int: 10, dex: 4 },
+        name: "Sura"
+    },
+    shaman: {
+        baseStats: { vit: 5, str: 4, int: 15, dex: 6 },
+        name: "Şaman"
+    },
+    lycan: {
+        baseStats: { vit: 12, str: 12, int: 2, dex: 4 },
+        name: "Lycan"
+    }
+};
+// KRİTİK TAŞIMA SONU
 
 const app = express();
 const server = http.createServer(app);
@@ -111,6 +140,7 @@ const playerSchema = new mongoose.Schema({
     skillSet: { type: String, default: null },
     skillPoints: { type: Number, default: 0 },
     skills: { type: Map, of: Number, default: {} }, // skillId: level
+    activeBuffs: { type: Map, of: Number, default: {} },
     
     createdAt: { type: Date, default: Date.now }
 });
@@ -639,7 +669,7 @@ const SKILL_DB = {
   warrior: {
     body: { // Bedensel
       1: { id: "warrior_1_1", name: "Üç Yönlü Kesme", type: "active", mpCost: 20, cooldown: 5000, damageMultiplier: 1.5 },
-      2: { id: "warrior_1_2", name: "Hava Kılıcı", type: "active", mpCost: 30, cooldown: 8000, damageMultiplier: 2.0 },
+      2: { id: "warrior_1_2", name: "Hava Kılıcı", type: "buff", mpCost: 30, cooldown: 60000, duration: 20000 }, // 20sn sürer, 60sn cooldown
       3: { id: "warrior_1_3", name: "Kılıç Çevirme", type: "active", mpCost: 40, cooldown: 12000, damageMultiplier: 1.8 }, // Alan hasarı
       4: { id: "warrior_1_4", name: "Öfke", type: "buff", mpCost: 50, cooldown: 30000, duration: 15000 }, // 15sn sürer, 30sn cooldown
       5: { id: "warrior_1_5", name: "Hamle", type: "active", mpCost: 25, cooldown: 10000, damageMultiplier: 1.2 }
@@ -797,11 +827,13 @@ const CLASS_SPECS = {
   default: { width: 64, height: 64, baseDmg: 15 },
 };
 
+
+
 const PLAYER_SPEED = 6;
 const ATTACK_RANGE = 80;
 const ATTACK_COOLDOWN = 500;
 const MAX_SKILL_LEVEL = 20; // YENİ EKLENEN SABİT
-const MAX_CHARACTERS_PER_ACCOUNT = 2; // YENİ: Hesap başına maksimum karakter sayısı
+const MAX_CHARACTERS_PER_ACCOUNT = 5; // YENİ: Hesap başına maksimum karakter sayısı
 const MOB_RESPAWN_TIME = 10000; // YENİ EKLENDİ: 10000ms = 10 Saniye
 
 // ---------------------- NPC TANIMLARI ----------------------
@@ -853,6 +885,75 @@ Object.keys(MAP_DATA).forEach(mapName => {
 });
 
 // ---------------------- FONKSİYONLAR ----------------------
+function handleAdminCommand(player, command) {
+    const parts = command.toLowerCase().trim().split(' ');
+    const cmd = parts[0]; 
+    const value = parseInt(parts[2]) || 0; // Eğer komut /level 50 ise, value = 50
+    
+    // ... (Yang komutları burada devam eder) ...
+    
+    // 2. /level <miktar> (DÜZELTİLDİ)
+    if (cmd === 'level' || cmd === 'setlevel') {
+        const newLevel = parseInt(parts[1]); // Örn: /level 50 -> newLevel = 50
+
+        if (newLevel >= 1 && newLevel <= 99) {
+            
+            // 1. Puanları Hesapla
+            const oldLevel = player.level;
+            const levelDifference = newLevel - oldLevel;
+            
+            if (levelDifference > 0) {
+                // Her seviye için 3 Stat Puanı ve 1 Beceri Puanı ver
+                player.statPoints += (levelDifference * 3);
+                player.skillPoints += levelDifference;
+            } else if (levelDifference < 0) {
+                // Eğer seviye düşürülüyorsa, puanları geri alma (karmaşık, şimdilik vermeyi engelle)
+                 return { type: 'error', message: "Seviye düşürme komutu bu versiyonda desteklenmemektedir." };
+            } else {
+                 return { type: 'error', message: "Mevcut seviyedesiniz." };
+            }
+            
+            // 2. Seviyeyi Ayarla
+            player.level = newLevel;
+            
+            // 3. EXP, HP ve MP'yi sıfırla/yenile
+            player.exp = 0; 
+            // Max EXP'yi yeni seviyeye göre yeniden hesaplamalısınız
+            player.maxExp = Math.floor(1000 * Math.pow(1.5, newLevel - 1));
+            player.hp = player.maxHp; 
+            player.mp = player.maxMp;
+            
+            // Statü artışlarının HP/MP/DMG üzerindeki etkisini yeniden hesapla
+            recalculatePlayerStats(player);
+            
+            return { 
+                type: 'system', 
+                message: `Seviyen ${newLevel} olarak ayarlandı. ${levelDifference * 3} Statü Puanı ve ${levelDifference} Beceri Puanı eklendi.` 
+            };
+        }
+        return { type: 'error', message: "Kullanım: /level <1-99>" };
+    }
+
+    // ... (Heal komutları ve diğer komutlar buradan devam eder) ...
+    
+    // 3. /heal (Tam can/mana)
+    if (cmd === 'heal') {
+        player.hp = player.maxHp;
+        player.mp = player.maxMp;
+        return { type: 'system', message: "Canın ve Manan tamamen doldu." };
+    }
+
+    // 4. /komutlar (Admin komut listesi)
+    if (cmd === 'komutlar' || cmd === 'help') {
+        return { 
+            type: 'system', 
+            message: "Mevcut komutlar: /yang <miktar>, /level <seviye>, /heal" 
+        };
+    }
+    
+    return { type: 'error', message: `Bilinmeyen admin komutu: /${command}` };
+}
+
 function recalculatePlayerStats(player) {
     if (!player) return;
 
@@ -864,28 +965,61 @@ function recalculatePlayerStats(player) {
     // Bu değişkenler, buff'lardan gelen geçici bonusları tutar
     let buffDmgBonus = 0;       // Örn: Büyülü Keskinlik
     let buffDefBonus = 0;       // Örn: Güçlü Beden, Büyülü Zırh
-    let buffAtkSpeedBonus = 0;  // Örn: Öfke
+    let buffAtkSpeedBonus = 0;  // YENİ: Saldırı Hızı Bonusu (ms cinsinden düşüş)
+    let buffMoveSpeedBonus = 0; // YENİ: Hareket Hızı Bonusu (Puan cinsinden)
     // (Gelecekte eklenebilir: buffHpBonus, buffMpBonus, vb.)
 
-    // Aktif buff'ları kontrol et
+    // YENİ TEMİZLEME/SABİTLEME: Önce yüzde/durum buff'larını sıfırla
+    player.damageReductionPercent = 0;
+    player.criticalChanceBonus = 0;
+    player.piercingChanceBonus = 0;
+    player.isStealthed = false;
+    player.manaShieldPercent = 0;
+    player.reflectDamagePercent = 0;
+
+    // --- BİREYSEL BUFF MANTIKLARI ---
+    
     if (buffs["warrior_1_4"]) { // Öfke (Savaşçı)
-        // Öfke'nin etkisini burada tanımla. Örn: +%20 Saldırı Hızı (şimdilik hasar verelim)
-        // Not: Saldırı hızı (ATTACK_COOLDOWN) anlık olarak "attack" eventinde kontrol edilecek.
-        // Şimdilik küçük bir hasar bonusu ekleyelim:
-        buffDmgBonus += 50; // Örnek: Öfke +50 hasar veriyor
+        buffDmgBonus += 50; 
+        buffMoveSpeedBonus += 3; 
+        buffAtkSpeedBonus -= 100;
     }
-    if (buffs["warrior_2_1"]) { // Güçlü Beden (Savaşçı)
-        // Güçlü Beden'in etkisini tanımla. Örn: +150 Savunma
+    if (buffs["warrior_1_2"]) { // Hava Kılıcı
+        buffDmgBonus += Math.floor(stats.str * 1.0); 
+    }
+    if (buffs["warrior_2_1"]) { // Güçlü Beden
         buffDefBonus += 150; 
+        player.damageReductionPercent += 0.10; // +%10 Hasar Azaltma
     }
-    if (buffs["sura_1_1"]) { // Büyülü Keskinlik (Sura)
-        // Büyülü Keskinlik: +INT*1.5 kadar hasar bonusu
+    if (buffs["ninja_2_5"]) { // Hafif Adım (Ninja)
+        buffMoveSpeedBonus += 4; 
+    }
+    if (buffs["ninja_1_5"]) { // Kamuflaj (Ninja)
+        player.isStealthed = true; // Görünmezlik
+    }
+    if (buffs["sura_1_1"]) { // Büyülü Keskinlik
         buffDmgBonus += Math.floor(stats.int * 1.5);
     }
-    if (buffs["sura_1_2"]) { // Büyülü Zırh (Sura)
-        // Büyülü Zırh: +INT*1.0 kadar defans bonusu
+    if (buffs["sura_1_2"]) { // Büyülü Zırh
         buffDefBonus += Math.floor(stats.int * 1.0);
+        player.damageReductionPercent += 0.05; // +%5 Hasar Azaltma
     }
+    if (buffs["sura_2_1"]) { // Karanlık Koruma
+        player.manaShieldPercent = 0.30; // %30 Hasarı MP'den tüket
+    }
+    if (buffs["lycan_1_4"]) { // Kurt Ruhu
+        player.criticalChanceBonus = 0.15; // %15 Kritik Şansı
+    }
+    if (buffs["lycan_1_5"]) { // Kızıl Kurt Ruhu
+        player.piercingChanceBonus = 0.15; // %15 Delici Şansı
+    }
+    if (buffs["shaman_1_3"]) { // Yansıtma
+        player.reflectDamagePercent = 0.15; // %15 Yansıtma
+    }
+    
+    // --- YENİ BUFF BÖLÜMÜ SONU ---
+
+    
     // (Diğer buff'lar buraya eklenebilir: Büyülü Koruma, Kutsama vb.)
     // --- YENİ BUFF BÖLÜMÜ SONU ---
 
@@ -907,17 +1041,18 @@ function recalculatePlayerStats(player) {
 
     // 3. Eşya bonusları, STATÜ bonusları VE BUFF bonuslarını birleştir
     
-    // Saldırı: Stat + Eşya + BUFF
+    // Saldırı
     player.bonusDmg = bonusDmg + Math.floor(stats.str * 1.5 + stats.dex * 0.5) + buffDmgBonus; 
-    // Toplam Defans: Stat + Eşya + BUFF
+    // Toplam Defans
     player.bonusDef = bonusDef + player.baseDef + buffDefBonus; 
-    // Bonus HP: Stat + Eşya
+    // Bonus HP/MP (Aynı kalır)
     player.bonusHp = bonusHp + (stats.vit * 10); 
-    // Bonus MP: Stat + Eşya
     player.bonusMp = bonusMp + (stats.int * 5);  
-    // Hız
-    player.bonusSpeed = bonusSpeed; 
-    // (Saldırı Hızı bonusunu 'player' objesinde saklayabiliriz)
+    
+    // Hız: Eşya bonusu + BUFF Hız Bonusu
+    player.bonusSpeed = bonusSpeed + buffMoveSpeedBonus; 
+    
+    // Saldırı Hızı: Sadece BUFF'lardan gelen fark
     player.bonusAttackSpeed = buffAtkSpeedBonus;
 
     // 4. Nihai Max Değerleri Ayarla
@@ -929,10 +1064,18 @@ function recalculatePlayerStats(player) {
     player.mp = Math.min(player.mp, player.maxMp);
 }
 
+
+
+
+
+/**
+ * Oyuncu verilerini MongoDB'ye kaydeder.
+ * (MongoDB Entegrasyonu)
+ */
 async function savePlayer(player) {
     if (!player) return;
     
-    // 1. Sadece kalıcı verileri al (socket.id, animState, keysPressed hariç)
+    // 1. Sadece kalıcı verileri al
     const saveObject = { 
         name: player.name, kingdom: player.kingdom, class: player.class, 
         map: player.map, x: player.x, y: player.y, direction: player.direction,
@@ -941,35 +1084,30 @@ async function savePlayer(player) {
         yang: player.yang,
         stats: player.stats, statPoints: player.statPoints, 
         inventory: player.inventory, equipment: player.equipment, 
-        skillSet: player.skillSet, skills: player.skills, skillPoints: player.skillPoints 
+        skillSet: player.skillSet, skills: player.skills, skillPoints: player.skillPoints, 
+        activeBuffs: player.activeBuffs || {}
     };
 
     try {
-        // Oyuncuyu bul ve güncelle (upsert: true, yoksa oluştur)
         await PlayerModel.findOneAndUpdate(
             { name: player.name }, 
             { $set: saveObject },
             { upsert: true, new: true, runValidators: true }
         );
-        // console.log(`Oyuncu ${player.name} MongoDB'ye kaydedildi.`);
     } catch (error) {
         console.error(`Oyuncu ${player.name} kaydedilirken HATA:`, error);
     }
 }
 
 /**
- * Oyuncu verilerini dosyadan yükler.
- * @param {string} playerName - Yüklenecek oyuncunun adı.
- * @returns {object | null} - Yüklenen oyuncu verisi veya null.
+ * Oyuncu verilerini MongoDB'den yükler.
+ * (MongoDB Entegrasyonu)
  */
 async function loadPlayer(playerName) {
     try {
-        // Mongoose ile karaktere isme göre bakar
         const data = await PlayerModel.findOne({ name: playerName }).lean(); 
         
-        // Eğer data bulunursa, item object'lerini de Player objesi içinde gönderir.
         if (data) {
-             // Mongoose'dan gelen "id" alanını temizle (socket.id ile karışmasın diye)
             delete data._id; 
             delete data.__v;
         }
@@ -980,91 +1118,147 @@ async function loadPlayer(playerName) {
     }
 }
 
-async function createPlayer(socket, data) { 
-    let player;
-    // await kullan
-    const existingData = await loadPlayer(data.name);
-    
+/**
+ * Oyuncu nesnesini oluşturur veya MongoDB'den yükler.
+ * (createPlayer ReferenceError hatasını çözer)
+ */
+async function createPlayer(socket, characterChoices) {
+    const charName = characterChoices.name;
+    const existingPlayer = await loadPlayer(charName);
+    const isNew = !existingPlayer;
 
-    if (existingData) {
-        // --- Mevcut Oyuncuyu Yükle ---
-        const specs = CLASS_SPECS[existingData.class] || CLASS_SPECS.default;
-        player = {
-            ...existingData, // Kayıtlı verileri al
-            id: socket.id, // Yeni socket ID'si
-            width: specs.width,
-            height: specs.height,
-            baseDmg: specs.baseDmg,
-            
-            // Anlık durumları sıfırla/başlangıç değeri ver
-            direction: existingData.direction || "down",
-            animState: "idle",
-            keysPressed: { w: false, a: false, s: false, d: false },
-            lastAttack: 0,
-            isAlive: true,
-            
-            // Yeni eklenen/mevcut olmayan alanları ekle (güvenlik için)
-            inventory: existingData.inventory || Array(25).fill(null),
-            skillSet: existingData.skillSet === undefined ? null : existingData.skillSet,
-            skills: existingData.skills || {},
-            activeBuffs: {},
-            skillCooldowns: {}
-            
-        };
-        console.log(`${player.name} (${player.class}) YÜKLENDİ.`);
+    let player;
+    let baseStats = {};
+    const DEFAULT_MAP_NAME = "village"; // Yerel değişken: default harita adı
+    const DEFAULT_SPAWN_POSITION = { x: 3200, y: 2400 }; // Yerel değişken: default pozisyon
+    const DEFAULT_BASE_STATS = { vit: 5, str: 5, int: 5, dex: 5 }; // Yerel değişken: default statlar
+
+    let baseMap = DEFAULT_MAP_NAME;
+    let basePos = DEFAULT_SPAWN_POSITION;
+
+    if (isNew) {
+        // Yeni Karakter Oluşturuluyor
+        const charClass = characterChoices.class;
+        const classSpec = CLASS_SPECS[charClass];
+        baseStats = { ...DEFAULT_BASE_STATS, ...classSpec.baseStats };
+        baseMap = classSpec.initialMap || DEFAULT_MAP_NAME;
+        basePos = classSpec.initialPosition || DEFAULT_SPAWN_POSITION;
         
-    } else {
-        // --- Yeni Oyuncu Oluştur ---
-        const specs = CLASS_SPECS[data.class] || CLASS_SPECS.default;
+        // Yeni oyuncu verisini oluştur
         player = {
             id: socket.id,
-            name: data.name,
-            kingdom: data.kingdom,
-            class: data.class,
-            map: "village",
-            x: 3200,
-            y: 2400,
-            width: specs.width,
-            height: specs.height,
+            name: charName,
+            kingdom: characterChoices.kingdom,
+            class: charClass,
+            map: baseMap,
+            x: basePos.x,
+            y: basePos.y,
+            width: classSpec.width,    // KRİTİK: Genişlik ekle
+            height: classSpec.height,  // KRİTİK: Yükseklik ekle
+            baseDmg: classSpec.baseDmg, // KRİTİK: Base Dmg ekle
             direction: "down",
-            animState: "idle",
             level: 1,
             exp: 0,
-            maxExp: 100,
-            hp: 100,
-            maxHp: 100,
-            mp: 50, // Düzeltme: 500 değil 50
-            maxMp: 50,
-            baseDmg: specs.baseDmg,
-            
-            yang: 5000, 
-            
-            bonusDmg: 0, bonusDef: 0, baseDef: 0, magicAttack: 0, 
-            bonusHp: 0, bonusMp: 0, bonusSpeed: 0, bonusAttackSpeed: 0,
-
-            keysPressed: { w: false, a: false, s: false, d: false },
-            lastAttack: 0,
-            isAlive: true, 
-            equipment: {
-                weapon: null, helmet: null, armor: null, shield: null,
-                necklace: null, earring: null, bracelet: null, shoes: null
-            },
-            inventory: Array(25).fill(null),
-
-            skillSet: null,
-            skillPoints: 0, 
-            stats: { vit: 5, str: 5, int: 5, dex: 5 },
+            maxExp: 1000, 
+            hp: 100, maxHp: 100, 
+            mp: 50, maxMp: 50,
+            yang: 0,
+            stats: baseStats,
             statPoints: 0,
-            skills: {},
-            activeBuffs: {},
-            skillCooldowns: {},
-            partyId: null
+            
+            // Envanter/Ekipman (Kalıcı Veriler)
+            inventory: [],
+            equipment: {}, 
+            
+            // Beceri Verileri (Kalıcı Veriler)
+            skillSet: null, 
+            skillPoints: 0, 
+            skills: {}, 
+            
+            // Buff Verileri (Kalıcı Veriler, Şemaya eklenmişti)
+            activeBuffs: {}, // KRİTİK: Boş obje olarak başlat
+            
+            // Kalıcı Olmayan/Geçici Veriler (Hata Çözümü İçin KRİTİK)
+            animState: "idle",
+            isAlive: true,
+            isMoving: false,
+            keysPressed: {}, // KRİTİK: Hareketin çalışması için boş obje
+            lastAttack: 0,
+            lastSkillUse: {}, // KRİTİK: Boş obje olarak başlat
+            skillCooldowns: {}, // KRİTİK: Boş obje olarak başlat
+            activeDebuffs: {}, // KRİTİK: Mob hasar mantığı için boş obje
+            tradeId: null,
+            lastChat: 0,
+            
+            // Hesaplama Sonucu Türetilen Statlar
+            bonusSpeed: 0,
+            bonusAttackSpeed: 0,
+            damageReductionPercent: 0,
+            criticalChanceBonus: 0,
+            piercingChanceBonus: 0,
+            isStealthed: false,
+            manaShieldPercent: 0,
+            reflectDamagePercent: 0,
         };
-        console.log(`${player.name} adlı YENİ oyuncu oluşturuldu.`);
+        
+        
+
+    } else {
+        // Var Olan Karakter Yükleniyor
+        const classSpec = CLASS_SPECS[existingPlayer.class];
+        
+        // MongoDB'den yüklenen veriyi kullanarak player objesini oluştur
+        player = {
+            id: socket.id,
+            ...existingPlayer, 
+            
+            // KRİTİK: Eksik olabilecek default/türetilmiş değerleri ekle
+            width: classSpec?.width || 64,
+            height: classSpec?.height || 64,
+            baseDmg: classSpec?.baseDmg || 20,
+            
+            // MongoDB'den yüklenen değerlerin üzerine yazan geçici veriler:
+            
+            // KRİTİK: Hareketi garantilemek için geçici state'leri sıfırla/yenile
+            keysPressed: {}, // KRİTİK: Boş olarak başlat (Eski hareket verisi silinmeli)
+            animState: "idle",
+            isAlive: true, 
+            isMoving: false,
+            lastAttack: 0,
+            
+            // KRİTİK: Buff/Cooldown'ları yükle (yüklü değilse boş obje kullan)
+            lastSkillUse: existingPlayer.lastSkillUse || {}, 
+            skillCooldowns: existingPlayer.skillCooldowns || {}, 
+            activeBuffs: existingPlayer.activeBuffs || {}, 
+            
+            // YENİ EK ZORUNLU ALANLAR
+            activeDebuffs: {}, 
+            tradeId: null,
+            lastChat: 0,
+            
+            // Hesaplama Sonucu Türetilen Statlar (recalculatePlayerStats tarafından doldurulacak)
+            bonusSpeed: 0,
+            bonusAttackSpeed: 0,
+            damageReductionPercent: 0,
+            criticalChanceBonus: 0,
+            piercingChanceBonus: 0,
+            isStealthed: false,
+            manaShieldPercent: 0,
+            reflectDamagePercent: 0,
+        };
+        
+        // Statüleri ekipman ve buff'lara göre yeniden hesapla
+        recalculatePlayerStats(player);
     }
 
-    players[socket.id] = player;
-    recalculatePlayerStats(player);
+    // --- YENİ EKLENTİ: ADMIN KONTROLÜ ---
+    const accountInfo = playerToAccountMap[socket.id];
+    if (accountInfo && ADMIN_ACCOUNTS.includes(accountInfo.username)) {
+        player.isAdmin = true;
+    } else {
+        player.isAdmin = false;
+    }
+    
     return player;
 }
 
@@ -1516,6 +1710,9 @@ io.on("connection", (socket) => {
 
   socket.on("attack", () => {
   const player = players[socket.id];
+    // YENİ: Toplam Cooldown = Sabit Değer + Buff Bonusu (negatif değer)
+  const totalCooldown = ATTACK_COOLDOWN + player.bonusAttackSpeed;
+
   // YENİ: Ölü oyuncu saldıramaz
   if (!player || !player.isAlive || Date.now() - player.lastAttack < ATTACK_COOLDOWN) return;
   player.lastAttack = Date.now();
@@ -1931,12 +2128,10 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
 
     // 4. Beceri bekleme süresinde mi?
     const now = Date.now();
+    player.skillCooldowns = player.skillCooldowns || {};
     const cooldownEnds = player.skillCooldowns[skillId] || 0;
     
-    // --- YENİ MANTIK: Buff'lar ---
-    // Eğer beceri bir buff ise VE zaten aktifse, cooldown'da olmasa bile yenilemesine izin verme
-    // (veya opsiyonel olarak: yenilemesine izin ver)
-    // Şimdilik: Zaten aktifse hata ver
+    // Buff kontrolü: Zaten aktifse kullandırtma
     if (skillData.type === "buff" && player.activeBuffs[skillId] && player.activeBuffs[skillId] > now) {
          socket.emit("skillError", { message: "Bu güçlendirme zaten aktif." });
          return;
@@ -1947,7 +2142,6 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
       socket.emit("skillError", { message: `Beceri ${remaining}sn içinde hazır olacak.` });
       return;
     }
-    // --- YENİ MANTIK SONU ---
 
     // --- BECERİ KULLANIMI BAŞARILI ---
     
@@ -1963,8 +2157,8 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
     // 7a. Hasar ve Statü Hesaplaması
     let totalDamage = 0;
     const skillLevelBonus = skillLevel * 20; // Her beceri puanı +20 düz hasar/etki
-    const physicalBase = player.baseDmg + player.bonusDmg; // STR/DEX ve eşyalardan gelen düz vuruş hasarı
-    const magicalBase = player.magicAttack; // INT'ten gelen büyü hasarı
+    const physicalBase = player.baseDmg + player.bonusDmg; 
+    const magicalBase = player.magicAttack; 
 
     if (player.class === 'warrior') {
         totalDamage = (physicalBase + (player.stats.str * 2) + skillLevelBonus) * skillData.damageMultiplier;
@@ -1994,11 +2188,7 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
                 mob.hp -= totalDamage;
                 targetsHit++;
                 if (mob.hp > 0 && !mob.targetId) mob.targetId = player.id;
-                if (mob.hp <= 0) {
-                    mob.isAlive = false;
-                    giveExp(player, mob.exp);
-                    // ... (drop mantığı) ...
-                }
+                // NOT: AoE içinde debuff uygulamak isterseniz bu alana eklemelisiniz.
             } else {
                 if (dist < minDistance) {
                     minDistance = dist;
@@ -2011,6 +2201,31 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
             closestMob.hp -= totalDamage;
             targetsHit = 1;
             if (closestMob.hp > 0 && !closestMob.targetId) closestMob.targetId = player.id;
+            
+            // --- YENİ DEBUFF UYGULAMA ALANI (Aktif Tek Hedef) ---
+            const now = Date.now();
+            const debuffDuration = (skillLevel * 1000) + 5000; 
+            const debuffEndTime = now + debuffDuration;
+            
+            // a) Zehirli Bulut (DOT)
+            if (skillId === "ninja_1_4") {
+                 // Zehir hasarı: Toplam hasarın %10'u
+                 const dotDamage = Math.max(10, Math.floor(totalDamage * 0.10)); 
+                 
+                 closestMob.activeDebuffs = closestMob.activeDebuffs || {};
+                 closestMob.activeDebuffs['poison'] = {
+                     endTime: debuffEndTime,
+                     dotDamage: dotDamage,
+                     lastTick: now, 
+                     tickInterval: 1000 
+                 };
+            }
+            
+            // NOT: Sura Dehşet (sura_1_3) 'buff' türündedir ve aşağıdaki buff bloğunda işlenmelidir.
+            // Bu kısım sadece aktif hasar becerilerini ilgilendirir.
+            
+            // --- DEBUFF UYGULAMA ALANI SONU ---
+            
             if (closestMob.hp <= 0) {
                 closestMob.isAlive = false;
                 giveExp(player, closestMob.exp);
@@ -2024,10 +2239,8 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
         player.hp = Math.min(player.maxHp, player.hp + healAmount);
         console.log(`${player.name}, ${skillData.name} kullandı ve ${Math.floor(healAmount)} HP yeniledi.`);
         
-    // --- BURASI GÜNCELLENDİ ---
+    // --- BURASI KRİTİK BUFF/DEBUFF ALANI ---
     } else if (skillData.type === "buff") {
-        // Buff'ın süresini SKILL_DB'den al (örn: 15000ms = 15 saniye)
-        // Beceri seviyesine göre süreyi uzatabiliriz: örn: her level +1 saniye
         const duration = (skillData.duration || 10000) + (skillLevel * 1000); 
         const endTime = Date.now() + duration;
 
@@ -2035,11 +2248,42 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
         player.activeBuffs[skillId] = endTime;
 
         console.log(`${player.name}, ${skillData.name} (Buff) ${duration/1000} saniyeliğine etkinleştirdi.`);
-
+        
+        // KRİTİK: Dehşet (Debuff, ancak oyuncunun buff listesinde tutulur)
+        if (skillId === "sura_1_3") {
+            const debuffDuration = (skillData.duration || 10000) + (skillLevel * 1000);
+            const debuffEndTime = Date.now() + debuffDuration;
+            
+            // Dehşet Statü Azaltma: Seviye başına %0.5, Max %10
+            const reductionPercent = Math.min(0.10, skillLevel * 0.005);
+            
+            // Mob'a uygulama (Çevredeki tüm moblara Dehşet uygula)
+            for (const mobId in mobs) {
+                const mob = mobs[mobId];
+                if (mob.map !== player.map || !mob.isAlive) continue;
+                const dist = distance(player, mob);
+                
+                // Oyuncu mob'a yeterince yakınsa
+                if (dist < 200) { 
+                    mob.activeDebuffs = mob.activeDebuffs || {};
+                    mob.activeDebuffs['fear'] = {
+                        endTime: debuffEndTime,
+                        reductionPercent: reductionPercent,
+                        originalDmg: mob.dmg, 
+                        originalDef: mob.def
+                    };
+                    // Statüleri hemen düşür
+                    mob.dmg = Math.floor(mob.originalDmg * (1 - reductionPercent));
+                    mob.def = Math.floor(mob.originalDef * (1 - reductionPercent));
+                    console.log(`Mob ${mob.type} dehşete kapıldı. DMG: ${mob.dmg}`);
+                }
+            }
+        }
+        
         // Buff'ın statüleri anında değiştirmesi için yeniden hesapla
         recalculatePlayerStats(player);
     }
-    // --- GÜNCELLEME SONU ---
+    // --- BURASI KRİTİK BUFF/DEBUFF ALANI SONU ---
 
     // 8. Client'a onayı ve bekleme süresini gönder
     socket.emit("skillUsed", { 
@@ -2047,7 +2291,7 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
         slotIndex: slotIndex, 
         cooldown: cooldownDuration
     });
-  });
+});
 
   // YENİ: STATÜ PUANI HARCAMA EVENTİ
   socket.on("spendStatPoint", (statType) => {
@@ -2366,6 +2610,29 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
           });
 
       } else {
+
+        if (message.startsWith("/")) {
+        const command = message.substring(1).trim(); // '/' işaretini kaldır
+
+        // Admin olup olmadığını kontrol et
+        const accountInfo = playerToAccountMap[socket.id];
+        const isAdmin = accountInfo && ADMIN_ACCOUNTS.includes(accountInfo.username);
+
+        if (isAdmin) {
+            const result = handleAdminCommand(player, command);
+            // Sonucu sadece adminin kendisine gönder
+            socket.emit("newChatMessage", result); 
+            return; 
+        } else {
+            // Admin olmayan bir oyuncu komut kullanmaya çalıştı
+            socket.emit("newChatMessage", {
+                type: 'error',
+                message: `Bilinmeyen komut: /${command}. Sadece Adminler komut kullanabilir.`
+            });
+            return;
+        }
+    }
+
           // 3. GENEL SOHBET MANTIĞI
           console.log(`[Genel Sohbet] ${player.name}: ${message}`);
           io.emit("newChatMessage", {
@@ -2609,15 +2876,33 @@ socket.on("loginAttempt", async ({ username, password }) => {
         return;
     }
 
-    // const match = await comparePassword(password, account.password); // Eğer bcrypt kullanıyorsanız
-    const match = comparePassword(password, account.password); // Basit şifre
+    // Şifre kontrolü
+    const match = comparePassword(password, account.password); 
 
     if (match) {
         // Başarılı giriş: socket ID'sine hesabı ata
         playerToAccountMap[socket.id] = { username: username, characters: account.characters };
         
-        // KRİTİK: Karakter listesini de gönder
-        socket.emit("loginSuccess", { characters: account.characters });
+        // --- KRİTİK DÜZELTME: KARAKTER DETAYLARINI ÇEKME BAŞLANGICI ---
+        const detailedCharacters = [];
+        for (const charName of account.characters) {
+            // Sadece sınıf, seviye ve adı çek
+            const playerData = await PlayerModel.findOne({ name: charName }).select('name class level').lean();
+            
+            // Hata önleme: Verinin varlığını kontrol et
+            if (playerData && playerData.class && playerData.level !== undefined) { 
+                detailedCharacters.push({
+                    name: playerData.name,
+                    class: playerData.class,
+                    level: playerData.level
+                });
+            } else {
+                 console.warn(`Karakter verisi eksik (Sınıf/Seviye): ${charName}. MongoDB kaydını kontrol edin.`);
+            }
+        }
+        
+        // KRİTİK: Detaylı listeyi gönder
+        socket.emit("loginSuccess", { characters: detailedCharacters });
         
     } else {
         socket.emit("loginFail", "Kullanıcı adı veya şifre yanlış.");
@@ -2641,16 +2926,20 @@ socket.on("createOrJoinCharacter", async (characterChoices) => {
 
     // 2. Zaten mevcut karakter mi? (Giriş Yapma)
     if (account.characters.includes(charName)) {
-        // ... (Karakterin oyunda olup olmadığı kontrolü aynı kalır) ...
         const alreadyOnline = Object.values(players).some(p => p.name === charName);
         if (alreadyOnline) {
              socket.emit("loginFail", "Bu karakter zaten oyunda.");
              return;
         }
 
-        // Karakter zaten kayıtlıysa, doğrudan yükle (await kullan)
+        // Var olan karakteri yükle.
         const player = await createPlayer(socket, { name: charName }); 
+        
         playerToAccountMap[socket.id].characterName = charName; 
+        
+        // KRİTİK: Yüklendikten sonra oyuncu listesine ekle
+        players[socket.id] = player; 
+        
         socket.emit("characterJoined");
         return;
     }
@@ -2664,22 +2953,24 @@ socket.on("createOrJoinCharacter", async (characterChoices) => {
     }
     
     // B. İsim kontrolü (Global olarak PlayerModel'de var mı?)
-    const existingPlayerData = await loadPlayer(charName); // await kullan
+    const existingPlayerData = await loadPlayer(charName); 
     if (existingPlayerData) {
         socket.emit("characterCreationFail", "Bu karakter adı zaten alınmış.");
         return;
     }
 
-    // 4. Yeni Karakter Başarılı Şekilde Oluşturuldu (await kullan)
+    // 4. Yeni Karakter Başarılı Şekilde Oluşturuldu
     const player = await createPlayer(socket, characterChoices); 
 
     // Hesabın karakter listesine ekle ve kaydet
     account.characters.push(charName);
-    // KRİTİK: MongoDB'ye kaydet
     await account.save(); 
 
     // playerToAccountMap'i güncelle
     playerToAccountMap[socket.id].characterName = charName; 
+
+    // KRİTİK: Oyuncuyu aktif listeye ekle
+    players[socket.id] = player;
 
     socket.emit("characterJoined");
 });
@@ -2769,7 +3060,7 @@ function cancelTrade(tradeId, notifyMessage) {
 /**
  * Ticareti onaylar ve eşya/yang transferini gerçekleştirir.
  */
-function executeTrade(tradeId) {
+async function executeTrade(tradeId) {
     try {
         const trade = activeTrades[tradeId];
         if (!trade || !trade.playerA_locked || !trade.playerB_locked) {
@@ -2846,11 +3137,11 @@ function executeTrade(tradeId) {
         console.log(`Ticaret ${tradeId} başarıyla tamamlandı. Sinyaller gönderiliyor.`);
         
         // KRİTİK SİNYALLER: Güncel Envanter ve Yang'ı GÖNDER
-        // Client'ın ekranı KAPATMASI ve envanterini senkronize etmesi için bu veriler zorunludur.
         
         // Player A'ya sinyal
         io.to(playerA.id).emit("tradeSuccess", { 
             message: "Ticaret başarıyla tamamlandı!",
+            // MongoDB'den sonra güncellenen Player objesinin son durumunu yolla
             inventory: playerA.inventory, 
             yang: playerA.yang            
         });
@@ -2858,22 +3149,23 @@ function executeTrade(tradeId) {
         // Player B'ye sinyal
         io.to(playerB.id).emit("tradeSuccess", { 
             message: "Ticaret başarıyla tamamlandı!",
+            // MongoDB'den sonra güncellenen Player objesinin son durumunu yolla
             inventory: playerB.inventory, 
             yang: playerB.yang            
         });
         
-        // --- 4. TİCARET OTURUMUNU TEMİZLE (Sinyal gönderildikten sonra!) ---
+        // --- 4. TİCARET OTURUMUNU TEMİZLE ---
         
-        // Oyuncuları kaydet
-        savePlayer(playerA);
-        savePlayer(playerB);
+        // Oyuncuları asenkron kaydet (await gerekli)
+        await savePlayer(playerA); // <<< ASENKRON KAYIT
+        await savePlayer(playerB); // <<< ASENKRON KAYIT
         
         // Oturumu temizle
         playerA.tradeId = null;
         playerB.tradeId = null;
         delete activeTrades[tradeId];
         
-        return; 
+        return;
         
     } catch (error) {
         console.error("!!! Ticaret YÜRÜTÜLÜRKEN KRİTİK HATA:", error);
@@ -3327,6 +3619,7 @@ function serverGameLoop() {
     if (!map) continue;
 
     let moving = false;
+    const totalSpeed = PLAYER_SPEED + player.bonusSpeed; // YENİ TOPLAM HIZ
     if (player.keysPressed["w"]) { player.y -= PLAYER_SPEED + player.bonusSpeed; player.direction = "up"; moving = true; }
     if (player.keysPressed["s"]) { player.y += PLAYER_SPEED + player.bonusSpeed; player.direction = "down"; moving = true; }
     if (player.keysPressed["a"]) { player.x -= PLAYER_SPEED + player.bonusSpeed; player.direction = "left"; moving = true; }
@@ -3357,11 +3650,56 @@ function serverGameLoop() {
   }
 
   // 2. Mob Mantığı (YENİ YAPAY ZEKA)
-  // const now = Date.now(); // Başa taşındı
-  for (const mobId in mobs) {
-    // ... (Mevcut mob mantığının tamamı burada devam ediyor) ...
-    // ... (Hiçbir değişiklik yapmana gerek yok) ...
+for (const mobId in mobs) {
     const mob = mobs[mobId];
+
+    // --- YENİ: DEBUFF SÜRE VE DOT KONTROLÜ ---
+    let needsRecalculate = false; 
+
+    if (mob.activeDebuffs) {
+        for (const debuffName in mob.activeDebuffs) {
+            const debuff = mob.activeDebuffs[debuffName];
+
+            // 1. Süre Doldu mu?
+            if (now > debuff.endTime) {
+                delete mob.activeDebuffs[debuffName];
+                needsRecalculate = true; 
+                console.log(`Mob ${mob.type} için ${debuffName} debuff'ı sona erdi.`);
+                continue;
+            }
+
+            // 2. Zehir (DOT) Hasarı Uygula
+            if (debuffName === 'poison' && now - debuff.lastTick >= debuff.tickInterval) {
+                 
+                // Hasarı uygula
+                mob.hp -= debuff.dotDamage;
+                debuff.lastTick = now; // Yeni tick zamanını ayarla
+                
+                // Mob öldü mü? (DOT ile ölebilir)
+                if (mob.hp <= 0 && mob.isAlive) {
+                    mob.isAlive = false;
+                    mob.deathTime = now;
+                    // Mob öldü. Buradan EXP veya Yang vermiyoruz (saldırıyı tetikleyen player yok).
+                    // Mob'a son hasarı vuran oyuncuya EXP vermek isterseniz, Zehir debuff'ına 'sourcePlayerId' eklemelisiniz.
+                    console.log(`Mob ${mob.type} zehirden öldü.`);
+                }
+            }
+        }
+    }
+
+    // 3. Dehşet (Fear) Etkisini Geri Al
+    if (needsRecalculate) {
+        if (!mob.activeDebuffs || !mob.activeDebuffs['fear']) {
+             // Dehşet kalktıysa veya hiç yoksa
+             if (mob.activeDebuffs && mob.activeDebuffs['fear'] === undefined && mob.originalDmg) {
+                mob.dmg = mob.originalDmg; 
+                mob.def = mob.originalDef;
+                delete mob.originalDmg;
+                delete mob.originalDef;
+             }
+        }
+    }
+    // --- DEBUFF KONTROLÜ SONU ---
 
     // 2a. Ölüm/Respawn Kontrolü (GÜNCELLENDİ)
     if (!mob.isAlive) {
@@ -3508,7 +3846,46 @@ function serverGameLoop() {
         mob.animState = "attack"; // <<< Mob saldırı menzilinde: attack animasyonu
         if (now - mob.lastAttack > mob.attackSpeed) {
           mob.lastAttack = now;
-          targetPlayer.hp -= mob.dmg;
+          
+          let damage = mob.dmg; // Mobun temel hasarı
+          
+          // --- YENİ HASAR İŞLEME MANTIĞI BAŞLANGICI ---
+          
+          // 1. Hasar Azaltma (Yüzde - Güçlü Beden, Büyülü Zırh)
+          if (targetPlayer.damageReductionPercent > 0) {
+              damage *= (1 - targetPlayer.damageReductionPercent); // Örn: %15 azatma için * 0.85
+              damage = Math.floor(damage);
+          }
+          
+          // 2. Yansıtma (reflectDamagePercent - Şaman Yansıtma)
+          if (targetPlayer.reflectDamagePercent > 0) {
+              const reflectedDamage = Math.floor(damage * targetPlayer.reflectDamagePercent);
+              // Yansıtılan hasarı moba uygula (Mob'un HP'sini hemen düşür)
+              mob.hp -= reflectedDamage; 
+              // Mob öldürme kontrolü (Yansıtma ile ölebilir)
+              if (mob.hp <= 0 && mob.isAlive) {
+                  mob.isAlive = false;
+                  mob.deathTime = Date.now(); // Ölüm zamanını ayarla
+                  console.log(`Mob ${mob.type} yansıtma hasarıyla öldü.`); 
+              }
+          }
+
+          // 3. Mana Kalkanı (manaShieldPercent - Sura Karanlık Koruma)
+          let hpDamage = damage;
+          if (targetPlayer.manaShieldPercent > 0) {
+              const manaCost = Math.ceil(damage * targetPlayer.manaShieldPercent); // Harcanacak mana
+              
+              if (targetPlayer.mp >= manaCost) {
+                  targetPlayer.mp -= manaCost;
+                  hpDamage = damage * (1 - targetPlayer.manaShieldPercent); // HP hasarı düşer
+              }
+              // Mana yetmezse mana kalkanı devre dışı kalır.
+          }
+          
+          // 4. Nihai HP Hasarını Uygula
+          targetPlayer.hp -= Math.floor(hpDamage); 
+          
+          // --- YENİ HASAR İŞLEME MANTIĞI SONU ---
           
           if (targetPlayer.hp <= 0 && targetPlayer.isAlive) {
             handlePlayerDeath(targetPlayer); 

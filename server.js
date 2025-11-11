@@ -6,6 +6,15 @@ const fs = require('fs');
 const path = require('path'); 
 const { v4: uuidv4 } = require('uuid');
 
+const mongoose = require('mongoose');
+const { MongoClient, ServerApiVersion } = require('mongodb');
+
+const MONGO_URI = "mongodb+srv://gameadmin:Ak387706@ashenrealms.dn8d9cx.mongodb.net/?appName=AshenRealms";
+
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('MongoDB Bağlantısı Başarılı.'))
+  .catch(err => console.error('MongoDB Bağlantı Hatası:', err));
+
 // YENİ: Şifreleri güvenli hale getirmek için kripto kütüphanesi ekle (npm install bcrypt)
 // Eğer npm install bcrypt yapmadıysanız, aşağıdaki satırı şimdilik yorum satırı yapın ve sadece düz şifre kullanın.
 // const bcrypt = require('bcrypt');
@@ -41,6 +50,81 @@ let activeTrades = {};
 
 let deadMetins = {}; // YENİ: Ölen metinleri ve ne zaman dirileceklerini tutar
 const METIN_RESPAWN_TIME = 60000; // YENİ: 1 dakika (60 saniye) sonra dirilir
+
+let accounts = {};
+
+// 1. Oyuncu Envanter/Ekipman Alt Şemaları
+const itemSchema = new mongoose.Schema({
+    id: Number,
+    name: String,
+    type: String,
+    iconSrc: String,
+    dmg: Number,
+    def: Number,
+    hp: Number,
+    mp: Number,
+    speed: Number,
+    plus: { type: Number, default: 0 },
+    quantity: { type: Number, default: 1 },
+    requiredLevel: Number,
+    forClass: String,
+    sellPrice: Number,
+}, { _id: false });
+
+// 2. Ana Oyuncu Şeması
+const playerSchema = new mongoose.Schema({
+    name: { type: String, required: true, unique: true },
+    kingdom: String,
+    class: String,
+    map: { type: String, default: "village" },
+    x: { type: Number, default: 3200 },
+    y: { type: Number, default: 2400 },
+    direction: { type: String, default: "down" },
+    
+    level: { type: Number, default: 1 },
+    exp: { type: Number, default: 0 },
+    maxExp: { type: Number, default: 100 },
+    hp: { type: Number, default: 100 },
+    maxHp: { type: Number, default: 100 },
+    mp: { type: Number, default: 50 },
+    maxMp: { type: Number, default: 50 },
+    yang: { type: Number, default: 5000 },
+    
+    stats: { 
+        vit: { type: Number, default: 5 },
+        str: { type: Number, default: 5 },
+        int: { type: Number, default: 5 },
+        dex: { type: Number, default: 5 }
+    },
+    statPoints: { type: Number, default: 0 },
+    
+    // Envanter (25 slot)
+    inventory: [itemSchema], 
+    
+    // Ekipman
+    equipment: { 
+        weapon: itemSchema, helmet: itemSchema, armor: itemSchema, shield: itemSchema,
+        necklace: itemSchema, earring: itemSchema, bracelet: itemSchema, shoes: itemSchema
+    },
+
+    // Beceriler
+    skillSet: { type: String, default: null },
+    skillPoints: { type: Number, default: 0 },
+    skills: { type: Map, of: Number, default: {} }, // skillId: level
+    
+    createdAt: { type: Date, default: Date.now }
+});
+
+const PlayerModel = mongoose.model('Player', playerSchema);
+
+// 3. Hesap Şeması (Karakter listesi için)
+const accountSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    characters: [String] // Sadece karakter isimlerini tutar
+});
+
+const AccountModel = mongoose.model('Account', accountSchema);
 
 // ---------------------- EŞYA VERİTABANI ----------------------
 // ---------------------- EŞYA VERİTABANI ----------------------
@@ -845,27 +929,29 @@ function recalculatePlayerStats(player) {
     player.mp = Math.min(player.mp, player.maxMp);
 }
 
-function savePlayer(player) {
-    // 1. Kaydedilecek veriyi temizle (Anlık durumları sil)
-    const { 
-        id, name, kingdom, class: charClass, map, x, y, direction,
-        level, exp, maxExp, hp, maxHp, mp, maxMp, yang, 
-        stats, statPoints, inventory, equipment, skillSet, skills, skillPoints 
-        // keysPressed, animState, lastAttack, bonusDmg gibi türetilmişler/anlık durumlar hariç
-    } = player;
+async function savePlayer(player) {
+    if (!player) return;
     
+    // 1. Sadece kalıcı verileri al (socket.id, animState, keysPressed hariç)
     const saveObject = { 
-        id, name, kingdom, class: charClass, map, x, y, direction,
-        level, exp, maxExp, hp: player.hp, maxHp, mp: player.mp, maxMp, yang,
-        stats, statPoints, inventory, equipment, skillSet, skills, skillPoints 
+        name: player.name, kingdom: player.kingdom, class: player.class, 
+        map: player.map, x: player.x, y: player.y, direction: player.direction,
+        level: player.level, exp: player.exp, maxExp: player.maxExp, 
+        hp: player.hp, maxHp: player.maxHp, mp: player.mp, maxMp: player.mp, 
+        yang: player.yang,
+        stats: player.stats, statPoints: player.statPoints, 
+        inventory: player.inventory, equipment: player.equipment, 
+        skillSet: player.skillSet, skills: player.skills, skillPoints: player.skillPoints 
     };
 
-    // 2. Dosya yolunu belirle
-    const filePath = path.join(SAVE_DIR, `${player.name}.json`);
-
     try {
-        fs.writeFileSync(filePath, JSON.stringify(saveObject, null, 2));
-        // console.log(`Oyuncu ${player.name} kaydedildi.`);
+        // Oyuncuyu bul ve güncelle (upsert: true, yoksa oluştur)
+        await PlayerModel.findOneAndUpdate(
+            { name: player.name }, 
+            { $set: saveObject },
+            { upsert: true, new: true, runValidators: true }
+        );
+        // console.log(`Oyuncu ${player.name} MongoDB'ye kaydedildi.`);
     } catch (error) {
         console.error(`Oyuncu ${player.name} kaydedilirken HATA:`, error);
     }
@@ -876,24 +962,29 @@ function savePlayer(player) {
  * @param {string} playerName - Yüklenecek oyuncunun adı.
  * @returns {object | null} - Yüklenen oyuncu verisi veya null.
  */
-function loadPlayer(playerName) {
-    const filePath = path.join(SAVE_DIR, `${playerName}.json`);
-    
-    if (fs.existsSync(filePath)) {
-        try {
-            const data = fs.readFileSync(filePath, 'utf8');
-            return JSON.parse(data);
-        } catch (error) {
-            console.error(`Oyuncu ${playerName} yüklenirken HATA:`, error);
-            return null;
+async function loadPlayer(playerName) {
+    try {
+        // Mongoose ile karaktere isme göre bakar
+        const data = await PlayerModel.findOne({ name: playerName }).lean(); 
+        
+        // Eğer data bulunursa, item object'lerini de Player objesi içinde gönderir.
+        if (data) {
+             // Mongoose'dan gelen "id" alanını temizle (socket.id ile karışmasın diye)
+            delete data._id; 
+            delete data.__v;
         }
+        return data; 
+    } catch (error) {
+        console.error(`Oyuncu ${playerName} MongoDB'den yüklenirken HATA:`, error);
+        return null;
     }
-    return null; // Dosya yoksa null dön
 }
 
-function createPlayer(socket, data) {
+async function createPlayer(socket, data) { 
     let player;
-    const existingData = loadPlayer(data.name);
+    // await kullan
+    const existingData = await loadPlayer(data.name);
+    
 
     if (existingData) {
         // --- Mevcut Oyuncuyu Yükle ---
@@ -2358,7 +2449,9 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
   });
 
   socket.on("registerAttempt", async ({ username, password }) => {
-    if (accounts[username]) {
+    // MongoDB kontrolü
+    const existingAccount = await AccountModel.findOne({ username });
+    if (existingAccount) {
         socket.emit("loginFail", "Bu kullanıcı adı zaten alınmış.");
         return;
     }
@@ -2366,14 +2459,18 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
     // const hashedPassword = await hashPassword(password); // Eğer bcrypt kullanıyorsanız
     const hashedPassword = hashPassword(password); // Basit şifre (güvensiz)
 
-    accounts[username] = { 
-        password: hashedPassword,
-        characters: [] // Bu hesaba ait karakterlerin listesi
-    };
-    saveAccounts();
-    socket.emit("registerSuccess");
+    try {
+        await AccountModel.create({ 
+            username: username,
+            password: hashedPassword,
+            characters: []
+        });
+        socket.emit("registerSuccess");
+    } catch (error) {
+        console.error("Kayıt Hatası:", error);
+        socket.emit("loginFail", "Sunucu hatası nedeniyle kayıt başarısız.");
+    }
 });
-
 
   socket.on("inviteToParty", (targetPlayerId) => {
       const inviter = players[socket.id];
@@ -2503,8 +2600,10 @@ socket.on("useSkill", ({ skillId, slotIndex }) => {
   });
 
 // YENİ EVENT: Giriş Yapma
+// YENİ EVENT: Giriş Yapma (async yap)
 socket.on("loginAttempt", async ({ username, password }) => {
-    const account = accounts[username];
+    // MongoDB'den hesabı bul
+    const account = await AccountModel.findOne({ username }).lean();
     if (!account) {
         socket.emit("loginFail", "Kullanıcı adı veya şifre yanlış.");
         return;
@@ -2526,35 +2625,37 @@ socket.on("loginAttempt", async ({ username, password }) => {
 });
 
 // YENİ EVENT: Karakter Oluşturma/Giriş Yapma
-socket.on("createOrJoinCharacter", (characterChoices) => {
+socket.on("createOrJoinCharacter", async (characterChoices) => { 
     const accountInfo = playerToAccountMap[socket.id];
     if (!accountInfo) {
          console.log("HATA: Hesap bilgisi yok.");
-         return; // Giriş yapılmamışsa burada kesilir.
+         return; 
     }
     console.log(`Giriş/Oluşturma Denemesi: ${characterChoices.name}`);
 
     const charName = characterChoices.name;
-    const account = accounts[accountInfo.username];
+    
+    // 1. MongoDB'den hesabı çek (güncelleme yapacağımız için .lean() kullanmıyoruz)
+    const account = await AccountModel.findOne({ username: accountInfo.username });
+    if (!account) return; 
 
-    // 1. Zaten mevcut karakter mi? (Giriş Yapma)
+    // 2. Zaten mevcut karakter mi? (Giriş Yapma)
     if (account.characters.includes(charName)) {
-        // KRİTİK KONTROL: Karakter zaten oyunda mı?
+        // ... (Karakterin oyunda olup olmadığı kontrolü aynı kalır) ...
         const alreadyOnline = Object.values(players).some(p => p.name === charName);
         if (alreadyOnline) {
              socket.emit("loginFail", "Bu karakter zaten oyunda.");
              return;
         }
 
-        // Karakter zaten kayıtlıysa, doğrudan yükle
-        const player = createPlayer(socket, { name: charName });
-        // playerToAccountMap'i güncelle
+        // Karakter zaten kayıtlıysa, doğrudan yükle (await kullan)
+        const player = await createPlayer(socket, { name: charName }); 
         playerToAccountMap[socket.id].characterName = charName; 
         socket.emit("characterJoined");
         return;
     }
 
-    // 2. Yeni Karakter Oluşturma Kontrolü
+    // 3. Yeni Karakter Oluşturma Kontrolü
     
     // A. Slot kontrolü
     if (account.characters.length >= MAX_CHARACTERS_PER_ACCOUNT) {
@@ -2562,20 +2663,20 @@ socket.on("createOrJoinCharacter", (characterChoices) => {
          return;
     }
     
-    // B. İsim kontrolü (Global olarak dosya var mı?)
-    const existingPlayerData = loadPlayer(charName);
+    // B. İsim kontrolü (Global olarak PlayerModel'de var mı?)
+    const existingPlayerData = await loadPlayer(charName); // await kullan
     if (existingPlayerData) {
-         // Başka bir hesaba ait karakter adına sahip olamaz.
         socket.emit("characterCreationFail", "Bu karakter adı zaten alınmış.");
         return;
     }
 
-    // 3. Yeni Karakter Başarılı Şekilde Oluşturuldu
-    const player = createPlayer(socket, characterChoices);
+    // 4. Yeni Karakter Başarılı Şekilde Oluşturuldu (await kullan)
+    const player = await createPlayer(socket, characterChoices); 
 
-    // Hesabın karakter listesine ekle
+    // Hesabın karakter listesine ekle ve kaydet
     account.characters.push(charName);
-    saveAccounts();
+    // KRİTİK: MongoDB'ye kaydet
+    await account.save(); 
 
     // playerToAccountMap'i güncelle
     playerToAccountMap[socket.id].characterName = charName; 
@@ -3486,9 +3587,9 @@ function serverGameLoop() {
 }
 
 setInterval(serverGameLoop, 50);
-setInterval(() => {
+setInterval(async () => { // async ekle
     for (const id in players) {
-        savePlayer(players[id]);
+        await savePlayer(players[id]); // await ekle
     }
 }, 30000); // 30 saniye
 
@@ -3508,28 +3609,9 @@ const DATA_ROOT = process.env.RENDER_DISK_MOUNT_PATH || __dirname;
 const ACCOUNTS_FILE = path.join(DATA_ROOT, 'accounts.json');
 const SAVE_DIR = path.join(DATA_ROOT, 'player_saves'); // Kayıt klasörümüz
 
-// --- HESAP VE KAYIT YÖNETİMİ ---
-let accounts = loadAccounts(); // Hesap verilerini global olarak tut
 
-function loadAccounts() {
-    if (fs.existsSync(ACCOUNTS_FILE)) {
-        try {
-            return JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
-        } catch (error) {
-            console.error("HESAP YÜKLENİRKEN HATA:", error);
-            return {};
-        }
-    }
-    return {};
-}
 
-function saveAccounts() {
-    try {
-        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(accounts, null, 2));
-    } catch (error) {
-        console.error("HESAP KAYDEDİLİRKEN HATA:", error);
-    }
-}
+
 
 // Oyuncu kayıt klasörünün var olup olmadığını kontrol et
 if (!fs.existsSync(SAVE_DIR)) {
